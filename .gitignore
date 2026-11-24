@@ -44,8 +44,9 @@ next-env.d.ts
 client_secret_*.json
 .env.local
 
-# Ignore all env files
+# Ignore all env files (keep the public template)
 .env*
+!.env.example
 # Local env backups (do not commit)
 env-backups/
 
