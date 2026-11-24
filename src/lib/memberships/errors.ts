@@ -1,0 +1,68 @@
+/**
+ * Structured Memberships error codes (API maps to 400/403/409).
+ * Phase 2 billing + Phase 3 entitlement / wallet / media.
+ */
+export const MembershipErrorCodes = {
+  PLAN_ARCHIVED: "PLAN_ARCHIVED",
+  PLAN_NOT_FOUND: "PLAN_NOT_FOUND",
+  PLAN_NOT_SELLABLE: "PLAN_NOT_SELLABLE",
+  OUTSIDE_REDEMPTION_WINDOW: "OUTSIDE_REDEMPTION_WINDOW",
+  GUEST_NOT_FOUND: "GUEST_NOT_FOUND",
+  MEMBER_NOT_FOUND: "MEMBER_NOT_FOUND",
+  INVALID_TRANSITION: "INVALID_TRANSITION",
+  PRORATION_FAILED: "PRORATION_FAILED",
+  STRIPE_NOT_CONFIGURED: "STRIPE_NOT_CONFIGURED",
+  PAYMENT_FAILED: "PAYMENT_FAILED",
+  FAMILY_NOT_ALLOWED: "FAMILY_NOT_ALLOWED",
+  UPGRADE_GROUP_MISMATCH: "UPGRADE_GROUP_MISMATCH",
+  IDEMPOTENCY_CONFLICT: "IDEMPOTENCY_CONFLICT",
+  CURRENCY_MISMATCH: "CURRENCY_MISMATCH",
+  VENUE_INVALID: "VENUE_INVALID",
+  AMOUNT_REQUIRED: "AMOUNT_REQUIRED",
+  PAUSE_NOT_ALLOWED: "PAUSE_NOT_ALLOWED",
+  // Phase 3
+  INELIGIBLE_VENUE: "INELIGIBLE_VENUE",
+  ENTITLEMENT_EXHAUSTED: "ENTITLEMENT_EXHAUSTED",
+  MEMBERSHIP_NOT_ACTIVE: "MEMBERSHIP_NOT_ACTIVE",
+  FAMILY_MEMBER_REQUIRED: "FAMILY_MEMBER_REQUIRED",
+  WALLET_NOT_CONFIGURED: "WALLET_NOT_CONFIGURED",
+  AGREEMENT_REQUIRED: "AGREEMENT_REQUIRED",
+  PHOTO_REQUIRED: "PHOTO_REQUIRED",
+  CUSTOM_ID_CONFLICT: "CUSTOM_ID_CONFLICT",
+  USAGE_EVENT_NOT_FOUND: "USAGE_EVENT_NOT_FOUND",
+  UNDO_NOT_ALLOWED: "UNDO_NOT_ALLOWED",
+  PERK_NOT_AVAILABLE: "PERK_NOT_AVAILABLE",
+  // Phase 4
+  NOT_LINKED_TO_GUEST: "NOT_LINKED_TO_GUEST",
+  CANCEL_ALREADY_SCHEDULED: "CANCEL_ALREADY_SCHEDULED",
+  ALTERNATIVE_INVALID: "ALTERNATIVE_INVALID",
+  CLICK_TO_CANCEL_DISABLED: "CLICK_TO_CANCEL_DISABLED",
+  SELF_SERVE_DENIED: "SELF_SERVE_DENIED",
+  // Dashboard invite / auto-link
+  INVITE_EMAIL_REQUIRED: "INVITE_EMAIL_REQUIRED",
+  INVITE_CONFLICT: "INVITE_CONFLICT",
+  INVITE_GUEST_BANNED: "INVITE_GUEST_BANNED",
+} as const;
+
+export type MembershipErrorCode =
+  (typeof MembershipErrorCodes)[keyof typeof MembershipErrorCodes];
+
+export class MembershipBillingError extends Error {
+  readonly code: MembershipErrorCode;
+  constructor(code: MembershipErrorCode, message: string) {
+    super(message);
+    this.name = "MembershipBillingError";
+    this.code = code;
+  }
+}
+
+export function isMembershipBillingError(
+  err: unknown
+): err is MembershipBillingError {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { name?: string }).name === "MembershipBillingError" &&
+    typeof (err as { code?: unknown }).code === "string"
+  );
+}

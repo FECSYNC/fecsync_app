@@ -1,0 +1,145 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ShoppingCart, Loader2 } from 'lucide-react';
+import { type Fabric } from '@/services/fabric';
+import {
+  formatFabricBundlePrice,
+  isFabricOutOfStock,
+  isFabricPurchasable,
+  isFabricSellable,
+} from '@/utils/fabricDisplay';
+import { useAuthAwareCartActions } from '@/hooks/use-cart';
+import { useToast } from '@/contexts/toast-context';
+import CatalogImage from '@/components/common/CatalogImage';
+
+interface FabricCardProps {
+  fabric: Fabric;
+  variants?: {
+    hidden?: { opacity: number; y: number };
+    visible?: { opacity: number; y: number; transition?: { duration: number; ease: number[] } };
+  };
+}
+
+const FabricCard: React.FC<FabricCardProps> = ({ fabric, variants }) => {
+  const sellable = isFabricSellable(fabric);
+  const outOfStock = isFabricOutOfStock(fabric);
+  const purchasable = isFabricPurchasable(fabric);
+  const [isAdding, setIsAdding] = React.useState(false);
+  const { addFabricToCart } = useAuthAwareCartActions();
+  const { addToast } = useToast();
+
+  const handleQuickAdd = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!purchasable || isAdding) return;
+
+    setIsAdding(true);
+    try {
+      await addFabricToCart({
+        id: fabric._id,
+        quantity: 1,
+        price: fabric.bundlePrice,
+        name: fabric.name,
+        image: fabric.image,
+        yardBundle: fabric.yardBundle,
+        taxRate: fabric.taxRate ?? null,
+        taxExempt: Boolean(fabric.taxExempt),
+      });
+      addToast(`Added ${fabric.name} bundle to cart`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not add fabric to cart';
+      addToast(message, 'error');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  return (
+    <motion.div variants={variants} className="group">
+      <Link
+        href={`/fabrics/${fabric._id}`}
+        prefetch={false}
+        className="block cursor-pointer bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl ring-1 ring-transparent hover:ring-[#D4AF37]/30 transition-all duration-300"
+      >
+        <div className="relative h-56 sm:h-64 overflow-hidden bg-gray-100">
+          <CatalogImage
+            src={fabric.image || '/placeholder.png'}
+            alt={fabric.name}
+            fill
+            optimizeWidth={720}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {purchasable ? (
+            <span className="absolute top-3 right-3 rounded-full bg-[#D4AF37] text-white text-xs font-semibold px-2.5 py-1 shadow-md">
+              {fabric.yardBundle} yd
+            </span>
+          ) : outOfStock ? (
+            <span className="absolute top-3 right-3 rounded-full bg-gray-900/85 text-white text-xs font-semibold px-2.5 py-1 shadow-md">
+              Out of stock
+            </span>
+          ) : (
+            <span className="absolute top-3 right-3 rounded-full bg-white/90 text-gray-600 text-xs font-medium px-2.5 py-1">
+              Gallery
+            </span>
+          )}
+          {sellable && (
+            <button
+              type="button"
+              onClick={handleQuickAdd}
+              disabled={isAdding || outOfStock}
+              className={`absolute bottom-3 right-3 p-2.5 rounded-full shadow-md transition-colors ${
+                outOfStock
+                  ? 'bg-gray-200/95 text-gray-400 cursor-not-allowed'
+                  : 'bg-white/95 text-[#B8941F] hover:bg-[#D4AF37] hover:text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed'
+              }`}
+              aria-label={
+                outOfStock
+                  ? 'Out of stock'
+                  : isAdding
+                    ? 'Adding to cart'
+                    : 'Add bundle to cart'
+              }
+            >
+              {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
+
+        <div className="p-4">
+          <h3 className="font-semibold text-gray-900 truncate group-hover:text-[#B8941F] transition-colors">
+            {fabric.name}
+          </h3>
+          <p className="text-sm text-gray-500 truncate mt-0.5">
+            {fabric.type} · {fabric.color}
+          </p>
+          {sellable ? (
+            <p className={`mt-2 text-sm font-semibold ${outOfStock ? 'text-gray-500' : 'text-gray-900'}`}>
+              {formatFabricBundlePrice(fabric)}
+              {outOfStock && (
+                <span className="block text-xs font-medium text-gray-400 mt-0.5">
+                  Currently unavailable
+                </span>
+              )}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">View details</p>
+          )}
+          <motion.span
+            className="mt-3 inline-flex items-center text-xs font-medium text-[#B8941F]"
+            initial={false}
+            whileHover={{ x: 2 }}
+          >
+            {purchasable ? 'Shop bundle →' : 'View fabric →'}
+          </motion.span>
+        </div>
+      </Link>
+    </motion.div>
+  );
+};
+
+export default FabricCard;

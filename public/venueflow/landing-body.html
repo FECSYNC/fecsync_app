@@ -1,0 +1,615 @@
+
+  <!-- Announcement bar -->
+  <div class="announce" id="announce">
+    <p>
+      Meet Flow Agent — your always-on AI teammate. Plus more in our Spring 2026 Launch.
+      <a href="#launch">Explore the launch</a>
+    </p>
+    <button class="announce-close" type="button" aria-label="Dismiss announcement">&times;</button>
+  </div>
+
+  <!-- Header / Navbar -->
+  <header class="site-header" id="siteHeader">
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="FECSYNC home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#0B1F2A"/>
+            <path d="M9 8h14v3.2H12.4V14h8.8v3.2H12.4V24H9V8z" fill="#1DB8A0"/>
+            <circle cx="23.5" cy="22.5" r="3.5" fill="#F4B942"/>
+          </svg>
+        </span>
+        <span class="brand-name">FECSYNC</span>
+      </a>
+
+      <nav class="primary-nav" id="primaryNav" aria-label="Main">
+        <ul class="nav-list">
+          <li class="nav-item has-mega">
+            <button class="nav-trigger" type="button" aria-expanded="false" data-mega="features">
+              Features
+              <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="mega" id="mega-features" hidden>
+              <div class="mega-inner">
+                <div class="mega-intro">
+                  <p class="mega-kicker">Company SaaS control plane + roadmap</p>
+                  <h3>Shipped venues, Enterprise HQ &amp; ticketing</h3>
+                  <a class="mega-link-cta" href="#enterprise">Enterprise HQ (shipped) →</a>
+                </div>
+                <div class="mega-cols">
+                  <div class="mega-col">
+                    <h4>Sell online &amp; in-venue</h4>
+                    <a href="#ticketing">Online Ticketing</a>
+                    <a href="#pos">Point of Sale (roadmap)</a>
+                    <a href="#memberships">Memberships (Growth+ sell, self-serve &amp; reports)</a>
+                  </div>
+                  <div class="mega-col">
+                    <h4>Serve your guests</h4>
+                    <a href="#waivers">Digital Waivers (roadmap)</a>
+                    <a href="#access">Access Control (roadmap)</a>
+                    <a href="#surveys">Guest Surveys (roadmap)</a>
+                  </div>
+                  <div class="mega-col">
+                    <h4>Grow the business</h4>
+                    <a href="#loyalty">Loyalty (roadmap)</a>
+                    <a href="#pricing">Plans &amp; pricing (live)</a>
+                    <a href="#analytics">Reporting (roadmap)</a>
+                  </div>
+                </div>
+                <aside class="mega-spotlight">
+                  <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=640&q=80" alt="Indoor trampoline park with colorful lighting" />
+                  <div>
+                    <p class="mega-kicker">Product spotlight</p>
+                    <strong>Intelligence in action</strong>
+                    <p>AI and automation are now built into every FECSYNC workflow.</p>
+                    <a href="#launch">Explore the launch →</a>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </li>
+
+          <li class="nav-item has-mega">
+            <button class="nav-trigger" type="button" aria-expanded="false" data-mega="industries">
+              Industries
+              <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="mega" id="mega-industries" hidden>
+              <div class="mega-inner mega-industries">
+                <div class="mega-intro">
+                  <p class="mega-kicker">Built for operators like you</p>
+                  <h3>See how venues in your category use FECSYNC</h3>
+                </div>
+                <div class="industry-grid">
+                  <a href="#industries"><span class="ind-icon" data-i="tp"></span>Trampoline Parks</a>
+                  <a href="#industries"><span class="ind-icon" data-i="pc"></span>Playcenters</a>
+                  <a href="#industries"><span class="ind-icon" data-i="wp"></span>Wake Parks</a>
+                  <a href="#industries"><span class="ind-icon" data-i="rs"></span>Roller Skating</a>
+                  <a href="#industries"><span class="ind-icon" data-i="ec"></span>Entertainment Centers</a>
+                  <a href="#industries"><span class="ind-icon" data-i="mu"></span>Museums</a>
+                  <a href="#industries"><span class="ind-icon" data-i="za"></span>Zoos &amp; Aquariums</a>
+                  <a href="#industries"><span class="ind-icon" data-i="rc"></span>Rock Climbing</a>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="nav-item has-mega">
+            <button class="nav-trigger" type="button" aria-expanded="false" data-mega="solutions">
+              Solutions
+              <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="mega" id="mega-solutions" hidden>
+              <div class="mega-inner mega-solutions">
+                <a class="solution-card" href="#grow">
+                  <img src="https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=480&q=80" alt="Guests enjoying an entertainment venue" />
+                  <div>
+                    <h4>Growing your business</h4>
+                    <p>Save time, empower decisions, and increase revenue from day one.</p>
+                  </div>
+                </a>
+                <a class="solution-card" href="#multi">
+                  <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=480&q=80" alt="Team collaborating in a modern office" />
+                  <div>
+                    <h4>Scaling multi-venues</h4>
+                    <p>One company workspace for many parks — entitled Enterprise adds the HQ multi-venue control plane (venue switcher + cross-park dashboard; fashion catalog stays company-wide; ticketing staff catalog is park-scoped under HQ).</p>
+                  </div>
+                </a>
+                <a class="solution-card" href="#enterprise">
+                  <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=480&q=80" alt="Large event crowd with stage lights" />
+                  <div>
+                    <h4>Enterprise HQ</h4>
+                    <p>Venue switcher, cross-park HQ dashboard, and unlimited venues by agreement — company admin only when entitled. Ticketing catalog, staff booking tools, HQ search/export, and public guest booking wizards are live on Starter+; POS and waivers ship later.</p>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="nav-item has-mega">
+            <button class="nav-trigger" type="button" aria-expanded="false" data-mega="why">
+              Why FECSYNC?
+              <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="mega" id="mega-why" hidden>
+              <div class="mega-inner mega-why">
+                <div class="mega-cols">
+                  <div class="mega-col">
+                    <h4>Company</h4>
+                    <a href="#about">About us</a>
+                    <a href="#stories">Customer stories</a>
+                    <a href="#values">Our values</a>
+                  </div>
+                  <div class="mega-col">
+                    <h4>Learn</h4>
+                    <a href="#blog">Blog</a>
+                    <a href="#academy">Academy</a>
+                    <a href="#demos">Demo videos</a>
+                  </div>
+                  <div class="mega-col">
+                    <h4>Support</h4>
+                    <a href="#help">Help center</a>
+                    <a href="#api">API docs</a>
+                    <a href="#contact">Contact support</a>
+                  </div>
+                </div>
+                <aside class="mega-spotlight compact">
+                  <div>
+                    <p class="mega-kicker">What's new</p>
+                    <strong>2026 Benchmark Report</strong>
+                    <p>Get ahead with insights from 2,800+ attraction operators.</p>
+                    <a href="#blog">Unlock insights →</a>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="#pricing">Pricing</a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a class="btn btn-ghost" href="/signin">Sign in</a>
+        <a class="btn btn-ghost" href="/register-company">Register your company</a>
+        <a class="btn btn-primary" href="/register-company">Sign up</a>
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-media" aria-hidden="true">
+        <img
+          src="https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=2000&q=80"
+          alt=""
+        />
+        <div class="hero-veil"></div>
+      </div>
+      <div class="hero-content">
+        <p class="brand-signal">FECSYNC</p>
+        <h1>The platform powering 3,000+ thriving attractions</h1>
+        <p class="hero-lede">
+          Everything your venue needs to move faster, simplify operations, and grow with confidence.
+        </p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary btn-lg" href="/register-company">Register your company</a>
+          <a class="btn btn-outline btn-lg" href="/signin">Sign in</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trusted logos marquee -->
+    <section class="trusted" aria-label="Trusted venues">
+      <p class="trusted-label">Trusted by over 3,000 venues worldwide</p>
+      <div class="marquee" data-marquee>
+        <div class="marquee-track">
+          <!-- Dummy logo pills (duplicated for seamless loop) -->
+          <div class="logo-pill"><span class="logo-dot" style="--c:#FF6B4A"></span>Altitude Co.</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#4A90FF"></span>SkyBound Parks</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#1DB8A0"></span>WaveHouse</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#F4B942"></span>Ninja Circuit</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#9B59B6"></span>PlayOrbit</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#E74C3C"></span>FlipZone</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#2ECC71"></span>Urban Leap</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#3498DB"></span>Echo Arcade</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#FF6B4A"></span>Altitude Co.</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#4A90FF"></span>SkyBound Parks</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#1DB8A0"></span>WaveHouse</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#F4B942"></span>Ninja Circuit</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#9B59B6"></span>PlayOrbit</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#E74C3C"></span>FlipZone</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#2ECC71"></span>Urban Leap</div>
+          <div class="logo-pill"><span class="logo-dot" style="--c:#3498DB"></span>Echo Arcade</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Intent cards -->
+    <section class="intents" id="intents">
+      <div class="section-head">
+        <h2>What brings you to FECSYNC today?</h2>
+      </div>
+      <div class="intent-grid">
+        <a class="intent-card" href="#stories">
+          <div class="intent-visual">
+            <img src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80" alt="Happy group celebrating at a venue" />
+          </div>
+          <h3>See how venues like mine use FECSYNC</h3>
+          <p>Streamline operations, save time, and deliver better guest experiences.</p>
+          <span class="text-link">Learn more →</span>
+        </a>
+        <a class="intent-card" href="#features">
+          <div class="intent-visual">
+            <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=800&q=80" alt="Point of sale terminal on a counter" />
+          </div>
+          <h3>Explore features built for attractions</h3>
+          <p>Bookings online today; guest Memberships sell, billing, redeem/verify, guest self-serve, and membership reports on Growth+; POS terminal UI still shipping — one company workspace.</p>
+          <span class="text-link">Learn more →</span>
+        </a>
+        <a class="intent-card" href="#pricing">
+          <div class="intent-visual">
+            <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80" alt="Notebook with charts and planning notes" />
+          </div>
+          <h3>Compare plans and pricing</h3>
+          <p>Plans designed to deliver value at every stage of growth.</p>
+          <span class="text-link">Learn more →</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Launch / AI section -->
+    <section class="launch" id="launch">
+      <div class="launch-copy">
+        <p class="eyebrow">Spring 2026 product launch</p>
+        <h2>Intelligence built for attractions: grow faster and run smarter</h2>
+        <p>
+          Handle guest inquiries 24/7 with always-on AI chat support, grow online ticket sales with live booking tools,
+          and turn insights into action — without adding to your team’s workload.
+        </p>
+        <a class="btn btn-primary" href="/register-company">Sign up</a>
+      </div>
+      <div class="launch-visual">
+        <img
+          src="https://images.unsplash.com/photo-1533227268428-f9ed0900fb3b?auto=format&fit=crop&w=1200&q=80"
+          alt="Bright indoor adventure park with climbing walls"
+        />
+      </div>
+    </section>
+
+    <!-- Feature: Online ticketing -->
+    <section class="feature-block" id="ticketing">
+      <div class="feature-copy">
+        <p class="eyebrow">Online ticket booking</p>
+        <h2>Increase your online revenue</h2>
+        <p>
+          Entitled companies publish park pages and sell timed tickets, day passes, and parties
+          online. Staff tools, payments, search/export, and HQ park scope are live — not every park
+          is online by default; each venue must enable public booking. Guests book at
+          <code>/book/{orgSlug}/{venueSlug}</code> when published. POS terminal and digital waivers
+          ship in later epics.
+        </p>
+        <div class="stat-callout">
+          <span class="stat-num">30%</span>
+          <span class="stat-desc">increase in average online revenue with FECSYNC</span>
+        </div>
+        <blockquote>
+          “We are making money while we sleep! Extra bookings come in overnight — and guests find it
+          straightforward.”
+          <cite>Alex Rivera · Owner, Dummy Playland</cite>
+        </blockquote>
+        <a class="text-link" href="/register-company?plan=starter">Start with Starter →</a>
+      </div>
+      <div class="feature-visual">
+        <img
+          src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1000&q=80"
+          alt="Smartphone showing a booking interface mock"
+        />
+      </div>
+    </section>
+
+    <!-- Feature: POS -->
+    <section class="feature-block reverse" id="pos">
+      <div class="feature-copy">
+        <p class="eyebrow">Roadmap · Ticketing POS</p>
+        <h2>Sell faster &amp; keep lines flowing</h2>
+        <p>
+          A fully integrated point-of-sale experience is on the product roadmap — managed under your company
+          workspace with venue-scoped operations when the module ships.
+        </p>
+        <blockquote>
+          “When POS ships, we expect capacity to stay shared with online bookings — one inventory story for the counter and the web.”
+          <cite>Jordan Lee · Marketing Lead, Dummy Jump Co.</cite>
+        </blockquote>
+        <a class="text-link" href="#features">Explore point-of-sale →</a>
+      </div>
+      <div class="feature-visual">
+        <img
+          src="https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=1000&q=80"
+          alt="Staff member helping a guest at a counter"
+        />
+      </div>
+    </section>
+
+    <!-- Feature: Multi-venue -->
+    <section class="feature-block" id="multi">
+      <div class="feature-copy">
+        <p class="eyebrow">Multi-venue management</p>
+        <h2>Save time managing multiple venues</h2>
+        <p>
+          Register a company workspace, get FECSYNC approval, then subscribe in Billing to unlock creates. Add parks and sites under your plan (Starter 1 · Growth up to 5 ·
+          Enterprise unlimited by agreement). Entitled Enterprise unlocks the HQ multi-venue control plane — venue switcher and cross-park HQ dashboard (venues and park-stamped ticketing filtered; fashion catalog, orders, and members stay company-wide). Ticketing catalog, staff booking tools, HQ search/export, and public guest booking wizards are live on Starter+; POS and waivers still ship later.
+        </p>
+        <a class="text-link" href="/register-company">Register your company workspace →</a>
+      </div>
+      <div class="feature-visual">
+        <img
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80"
+          alt="City skyline representing multi-location operations"
+        />
+      </div>
+    </section>
+
+    <!-- Platform CTA -->
+    <section class="platform" id="features">
+      <div class="platform-copy">
+        <p class="eyebrow">Company workspace + roadmap modules</p>
+        <h2>Run your business from one platform</h2>
+        <p>
+          Purpose-built for growing attractions — company admin, multi-park venues, and Enterprise HQ ship today;
+          ticketing catalog, staff booking tools, HQ search/export, and public guest booking wizards are live for entitled companies; POS and other guest
+          modules continue to ship in later phases.
+        </p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="#features">See all features</a>
+          <a class="btn btn-outline-dark" href="#pricing">View pricing</a>
+        </div>
+      </div>
+      <div class="platform-visual">
+        <img
+          src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80"
+          alt="Laptop dashboard showing analytics charts"
+        />
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats" id="about">
+      <div class="section-head light">
+        <h2>Supporting your business every step of the way</h2>
+        <p>Whether you manage one venue or 100, FECSYNC is built to help you succeed.</p>
+      </div>
+      <div class="stats-grid">
+        <div><strong>280</strong><span>team members</span></div>
+        <div><strong>3,000+</strong><span>customers</span></div>
+        <div><strong>24/7</strong><span>global support</span></div>
+        <div><strong>8M</strong><span>bookings / month</span></div>
+        <div><strong>165M</strong><span>guests served yearly</span></div>
+        <div><strong>$5B</strong><span>transactions processed</span></div>
+      </div>
+    </section>
+
+    <!-- Pricing teaser -->
+    <section class="pricing" id="pricing">
+      <div class="section-head">
+        <h2>Simple plans that scale with you</h2>
+        <p>Packages for venue operators — Demo is a free limited trial (modules locked). Paid packages: FECSYNC approval unlocks admin; Billing subscribe (or an ops plan stamp) unlocks venues, seats, and catalog creates. Caps show on your Billing page once entitled.</p>
+      </div>
+      <div class="pricing-grid">
+        <article class="price-card">
+          <h3>Demo</h3>
+          <p class="price">Free</p>
+          <ul>
+            <li>Free Checkout · no card</li>
+            <li>Company dashboard + profile</li>
+            <li>Other apps locked</li>
+          </ul>
+          <a class="btn btn-outline-dark" href="/register-company?plan=demo">Try Demo</a>
+        </article>
+        <article class="price-card">
+          <h3>Starter</h3>
+          <p class="price"><span>$</span>199<span>/mo</span></p>
+          <ul>
+            <li>1 venue / park</li>
+            <li>Team seats + catalog tools</li>
+            <li>Online ticketing: staff catalog, public/admin booking wizards, HQ search &amp; bookings export (POS/waivers later)</li>
+          </ul>
+          <a class="btn btn-outline-dark" href="/register-company?plan=starter">Choose Starter</a>
+        </article>
+        <article class="price-card featured">
+          <p class="badge">Most popular</p>
+          <h3>Growth</h3>
+          <p class="price"><span>$</span>449<span>/mo</span></p>
+          <ul>
+            <li>Up to 5 venues</li>
+            <li>Park filter in admin + park-lock seats to assigned venues (no Enterprise required)</li>
+            <li>Online ticketing: staff catalog, public/admin booking wizards, HQ search &amp; bookings export (POS/waivers later)</li>
+            <li>Guest park Memberships: plans, eligibility, CRM, admin sell/billing + redeem/verify desk, guest self-serve &amp; reports</li>
+            <li>Up to 25 marketplace booking packages (Connect payouts)</li>
+            <li>POS / waivers / loyalty when shipped</li>
+          </ul>
+          <a class="btn btn-primary" href="/register-company?plan=growth">Choose Growth</a>
+        </article>
+        <article class="price-card" id="pricing-enterprise">
+          <h3>Enterprise</h3>
+          <p class="price">Custom</p>
+          <ul>
+            <li>Unlimited venues (by agreement)</li>
+            <li>HQ control plane (switcher + rollup)</li>
+            <li>Online ticketing: staff catalog, public/admin booking wizards, HQ search &amp; bookings export (POS/waivers later)</li>
+            <li>Guest park Memberships (multi-venue HQ eligibility + redeem/verify; admin sell &amp; billing; guest self-serve &amp; reports)</li>
+            <li>Unlimited marketplace booking packages (Connect payouts)</li>
+            <li>Dedicated success</li>
+          </ul>
+          <a class="btn btn-outline-dark" href="/register-company?plan=enterprise">Contact sales</a>
+        </article>
+      </div>
+    </section>
+
+    <!-- Feature: Guest park Memberships (Phases 1–5) -->
+    <section class="feature-block" id="memberships">
+      <div class="feature-copy">
+        <p class="eyebrow">Guest park Memberships</p>
+        <h2>Season and recurring memberships for Growth+</h2>
+        <p>
+          Entitled Growth and Enterprise companies configure membership plans,
+          multi-venue eligibility, and guest CRM profiles in company admin —
+          and sell, renew, upgrade/downgrade, pause, cancel, and recover
+          failed payments from Memberships → Members (Stripe when configured;
+          collected/pending honesty without it). Guests manage linked
+          memberships online (Profile → Memberships: upgrade/renew/cancel/card,
+          click-to-cancel, agreements). Staff get real sold/active/churn reports
+          and Enterprise advanced dunning. Redeem/verify at the Redeem desk
+          enforces CURRENT / VISITING / INELIGIBLE with family shared visits
+          (beta). Stable POS/online verify adapters are live; full POS till UI
+          ships later. Starter packages stay on ticketing; Demo keeps
+          Memberships locked.
+        </p>
+      </div>
+    </section>
+
+    <!-- Feature: Enterprise HQ -->
+    <section class="feature-block" id="enterprise">
+      <div class="feature-copy">
+        <p class="eyebrow">Enterprise</p>
+        <h2>Enterprise HQ multi-venue control plane</h2>
+        <p>
+          Entitled Enterprise companies unlock company-admin HQ: a venue switcher in admin chrome,
+          a cross-park HQ dashboard (real venue health + plan meters), and location scope that
+          filters venue lists, HQ items, and park-stamped ticketing catalog. Fashion catalog,
+          orders, and members stay company-wide. Ticketing catalog, staff booking tools, HQ search/export, and public guest booking wizards are package-enabled on
+          Starter+; POS and waivers still ship later. Unlimited venues by agreement. See
+          <a class="text-link" href="#pricing-enterprise">Enterprise pricing</a>.
+        </p>
+        <a class="text-link" href="/register-company?plan=enterprise">Contact sales / register for Enterprise →</a>
+      </div>
+      <div class="feature-visual">
+        <img
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80"
+          alt="Multi-location operations overview"
+        />
+      </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="newsletter" id="get-started">
+      <div class="newsletter-inner">
+        <h2>Get venue tips in your inbox</h2>
+        <p>Dummy form — nothing is submitted. Free education, tips, and product updates.</p>
+        <form class="newsletter-form" id="newsletterForm">
+          <label class="sr-only" for="email">Email</label>
+          <input id="email" type="email" placeholder="you@venue.com" required />
+          <button class="btn btn-primary" type="submit">Subscribe</button>
+        </form>
+        <p class="form-note" id="formNote" hidden>Thanks! (Demo only — no email was sent.)</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="contact">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="#1DB8A0"/>
+              <path d="M9 8h14v3.2H12.4V14h8.8v3.2H12.4V24H9V8z" fill="#0B1F2A"/>
+              <circle cx="23.5" cy="22.5" r="3.5" fill="#F4B942"/>
+            </svg>
+          </span>
+          <span class="brand-name">FECSYNC</span>
+        </a>
+        <p>Company SaaS control plane for multi-park operators. Ticketing catalog, staff booking tools, HQ search/export, and public guest booking wizards are live for entitled companies; guest Memberships sell, billing, redeem/verify, self-serve &amp; reports on Growth+; POS and other guest modules still shipping.</p>
+      </div>
+      <div>
+        <h4>Features</h4>
+        <a href="#enterprise">Enterprise HQ (shipped)</a>
+        <a href="#ticketing">Online Ticketing</a>
+        <a href="#memberships">Memberships (Growth+ sell, self-serve &amp; reports)</a>
+        <a href="#pos">Point of Sale (roadmap)</a>
+        <a href="#pricing">Plans &amp; pricing</a>
+      </div>
+      <div>
+        <h4>Industries</h4>
+        <a href="#industries">Trampoline Parks</a>
+        <a href="#industries">Playcenters</a>
+        <a href="#industries">Museums</a>
+        <a href="#industries">Climbing</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="#about">About</a>
+        <a href="#stories">Stories</a>
+        <a href="#help">Help</a>
+        <a href="#api">API</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 FECSYNC Demo · Dummy content for learning</p>
+      <div class="footer-links">
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile drawer -->
+  <div class="mobile-drawer" id="mobileDrawer" hidden>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
+      <div class="drawer-head">
+        <span class="brand-name">FECSYNC</span>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="Close menu">&times;</button>
+      </div>
+      <nav class="drawer-nav" aria-label="Mobile">
+        <details>
+          <summary>Features</summary>
+          <a href="#ticketing">Online Ticketing</a>
+          <a href="#pos">Point of Sale (roadmap)</a>
+          <a href="#memberships">Memberships (Growth+ sell, self-serve &amp; reports)</a>
+          <a href="#waivers">Digital Waivers (roadmap)</a>
+          <a href="#enterprise">Enterprise HQ (shipped)</a>
+          <a href="#analytics">Reporting (roadmap)</a>
+          <a href="#features">See all features</a>
+        </details>
+        <details>
+          <summary>Industries</summary>
+          <a href="#industries">Trampoline Parks</a>
+          <a href="#industries">Playcenters</a>
+          <a href="#industries">Wake Parks</a>
+          <a href="#industries">Entertainment Centers</a>
+          <a href="#industries">Museums</a>
+          <a href="#industries">Climbing</a>
+        </details>
+        <details>
+          <summary>Solutions</summary>
+          <a href="#grow">Growing your business</a>
+          <a href="#multi">Scaling multi-venues</a>
+          <a href="#enterprise">Enterprise HQ</a>
+        </details>
+        <details>
+          <summary>Why FECSYNC?</summary>
+          <a href="#about">About us</a>
+          <a href="#stories">Customer stories</a>
+          <a href="#blog">Blog</a>
+          <a href="#academy">Academy</a>
+          <a href="#help">Help center</a>
+          <a href="#api">API docs</a>
+        </details>
+        <a class="drawer-link" href="#pricing">Pricing</a>
+        <a class="drawer-link" href="#launch">Product launch</a>
+      </nav>
+      <div class="drawer-actions">
+        <a class="btn btn-ghost" href="/signin">Sign in</a>
+        <a class="btn btn-ghost" href="/register-company">Register your company</a>
+        <a class="btn btn-primary" href="/register-company">Sign up</a>
+      </div>
+    </div>
+  </div>
+
+  

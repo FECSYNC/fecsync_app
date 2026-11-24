@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Untitled Document.md</title>
+  <style>
+  @import url("https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0-alpha2/katex.min.css");
+
+  body {
+    font-family: Georgia, Cambria, serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #373D49;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Source Sans Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+  h1 { font-size: 2em; }
+  h2 { font-size: 1.5em; }
+  h3 { font-size: 1.25em; }
+  a { color: #35D7BB; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: "Ubuntu Mono", Monaco, monospace;
+    background: #F5F7FA;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #F5F7FA;
+    padding: 1em;
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  .hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0;
+    color: #333;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid #A0AABF;
+    padding-left: 1em;
+    margin-left: 0;
+    font-style: italic;
+    color: #666;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid #E8E8E8;
+    padding: 0.5em;
+    text-align: left;
+  }
+  th {
+    background: #F5F7FA;
+    font-weight: 600;
+  }
+  #preview .table {
+    width: auto;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+</style>
+</head>
+<body id="preview">
+<h1 class="code-line has-line-data" data-line-start="0" data-line-end="1"><a id="Orgmembership_RBAC_Complete_Execution_Bible_0"></a>Org-membership RBAC — Complete Execution Bible</h1>
+<p class="has-line-data" data-line-start="2" data-line-end="4"><strong>Canonical feature name (use this in Cursor):</strong><br>
+<strong>Align &amp; harden org-membership RBAC</strong> (Account → Organization)</p>
+<p class="has-line-data" data-line-start="5" data-line-end="6"><strong>Companion names Cursor must treat as the same feature:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="7" data-line-end="8">Update org-membership RBAC</li>
+<li class="has-line-data" data-line-start="8" data-line-end="9">Work on staff tenancy (<code>actor.orgId</code> / <code>companyWideView</code>)</li>
+<li class="has-line-data" data-line-start="9" data-line-end="10">Change the permission catalog (<code>P.*</code> in <code>permissions.ts</code>)</li>
+<li class="has-line-data" data-line-start="10" data-line-end="11">Fix members admin (<code>/admin/users</code>, <code>/api/admin/members</code>)</li>
+<li class="has-line-data" data-line-start="11" data-line-end="12">Align with the Multi-Tenant RBAC architecture doc — map Account → Organization</li>
+<li class="has-line-data" data-line-start="12" data-line-end="13">Multi-company registration / onboarding (create Organization + first <code>platform_admin</code>)</li>
+</ul>
+<p class="has-line-data" data-line-start="13" data-line-end="15"><strong>Architecture source of truth (concepts):</strong><br>
+<code>Multi-Tenant RBAC Full Architecture &amp; Implementation.html</code></p>
+<p class="has-line-data" data-line-start="16" data-line-end="18"><strong>Implementation source of truth (this app):</strong><br>
+This Next.js app (<code>harewa-dev</code>). Do <strong>not</strong> rebuild the HTML doc’s Django ERP. Map concepts onto Harewa names and keep the fashion/tailoring product.</p>
+<p class="has-line-data" data-line-start="19" data-line-end="20"><strong>How to use this file</strong></p>
+<ol>
+<li class="has-line-data" data-line-start="21" data-line-end="22">Read <strong>Part 0–8</strong> before any coding.</li>
+<li class="has-line-data" data-line-start="22" data-line-end="23">Execute <strong>exactly one phase</strong> when the user says <code>START PHASE N</code>.</li>
+<li class="has-line-data" data-line-start="23" data-line-end="24">After a phase, paste that phase’s <strong>Follow-up Audit Prompt</strong>.</li>
+<li class="has-line-data" data-line-start="24" data-line-end="25">Never skip ahead. Never start Phase N+1 until Phase N audit has passed.</li>
+<li class="has-line-data" data-line-start="25" data-line-end="27">If a previous phase is incomplete, <strong>fix it first</strong>, then continue.</li>
+</ol>
+<p class="has-line-data" data-line-start="27" data-line-end="28"><strong>Hard stop until instructed:</strong> This document is the plan. Do not implement until the user says <code>START PHASE 1</code>.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="31" data-line-end="32"><a id="PART_0_How_Cursor_must_behave_31"></a>PART 0 — How Cursor must behave</h1>
+<h2 class="code-line has-line-data" data-line-start="33" data-line-end="34"><a id="Role_33"></a>Role</h2>
+<p class="has-line-data" data-line-start="35" data-line-end="36">Act as senior software architect, full-stack engineer, database engineer, security engineer, QA engineer, and technical project manager for <strong>harewa-dev</strong>.</p>
+<h2 class="code-line has-line-data" data-line-start="37" data-line-end="38"><a id="Nonnegotiable_product_rules_Harewa_37"></a>Non-negotiable product rules (Harewa)</h2>
+<p class="has-line-data" data-line-start="39" data-line-end="40">From <code>.cursor/rules/customer-vs-tailor-sections.mdc</code>:</p>
+<ul>
+<li class="has-line-data" data-line-start="41" data-line-end="42"><strong>Customers (<code>client</code> preset):</strong> storefront + <code>/profile</code> only. Shop, cart, checkout, customize, Find a Tailor (<code>/tailors</code>), campaign join (<code>/join/[slug]</code>), measurements from profile.</li>
+<li class="has-line-data" data-line-start="42" data-line-end="43"><strong>Tailors (<code>tailor</code> Membership preset):</strong> <code>/tailor/*</code> only. Home, jobs, campaigns, notifications, dashboard. Default after sign-in: <code>/tailor/home</code>. Header “Store” may open <code>/home</code>.</li>
+<li class="has-line-data" data-line-start="43" data-line-end="44"><strong>Do not</strong> put tailor studio tools on customer pages.</li>
+<li class="has-line-data" data-line-start="44" data-line-end="45"><strong>Do not</strong> put customer orders/wishlist inside the tailor dashboard.</li>
+<li class="has-line-data" data-line-start="45" data-line-end="47"><strong>Do not</strong> weaken RBAC so customers can manage tailor clients or campaigns.</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="47" data-line-end="48"><a id="Nonnegotiable_RBAC_rules_from_the_architecture_doc_mapped_47"></a>Non-negotiable RBAC rules (from the architecture doc, mapped)</h2>
+<ol>
+<li class="has-line-data" data-line-start="49" data-line-end="50">Authorization uses <strong>permission codes</strong>, never role <strong>names</strong>.</li>
+<li class="has-line-data" data-line-start="50" data-line-end="51">UI hiding is not security. Every mutating API re-checks server-side.</li>
+<li class="has-line-data" data-line-start="51" data-line-end="52">Never trust client-supplied <code>orgId</code> / <code>account_id</code> / <code>?orgId=</code>.</li>
+<li class="has-line-data" data-line-start="52" data-line-end="53">Company A and Company B never share roles, teams, or org-scoped records.</li>
+<li class="has-line-data" data-line-start="53" data-line-end="54">Roles/templates are unique per tenant: <code>(orgId, name)</code>.</li>
+<li class="has-line-data" data-line-start="54" data-line-end="55">Every staff list, detail-by-id, report, export, and API that is org-scoped must apply <strong>tenant filter</strong>; ownership-capable resources also apply <strong>visibility</strong> (<code>companyWideView</code>).</li>
+<li class="has-line-data" data-line-start="55" data-line-end="57">Do not create a second RBAC system. Extend Organization + Membership + RoleTemplate + <code>P.*</code>.</li>
+</ol>
+<h2 class="code-line has-line-data" data-line-start="57" data-line-end="58"><a id="Explicitly_out_of_scope_do_not_build_57"></a>Explicitly out of scope (do not build)</h2>
+<p class="has-line-data" data-line-start="59" data-line-end="60">The HTML doc Part B ERP modules are <strong>not</strong> this product:</p>
+<ul>
+<li class="has-line-data" data-line-start="61" data-line-end="62">invoices / receipts / quotations / requisitions / waybills modules</li>
+<li class="has-line-data" data-line-start="62" data-line-end="63">job_orders / inventory / store / expense ERP modules</li>
+<li class="has-line-data" data-line-start="63" data-line-end="64">accounting ledger / finance_engine / tax_engine report pipeline</li>
+<li class="has-line-data" data-line-start="64" data-line-end="65">mailing campaigns / videocalls / HR / payroll / smart attendance</li>
+<li class="has-line-data" data-line-start="65" data-line-end="66"><code>/api/v1/</code> offline sync</li>
+<li class="has-line-data" data-line-start="66" data-line-end="67">Django <code>/auth/security/roles</code> URL tree</li>
+<li class="has-line-data" data-line-start="67" data-line-end="68">SubUser dual-password login / <code>acting_as_team_member_id</code></li>
+<li class="has-line-data" data-line-start="68" data-line-end="69">Multi-company <strong>switcher</strong> UI (a user hopping between orgs in-session) — still out. Registration/onboarding of a <em>new</em> company is <strong>in scope</strong>.</li>
+<li class="has-line-data" data-line-start="69" data-line-end="71">Merging customer and tailor navigation</li>
+</ul>
+<p class="has-line-data" data-line-start="71" data-line-end="72">Commerce “invoice” email PDFs and shipping <code>waybill_document</code> URLs already exist and stay as commerce helpers only.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="75" data-line-end="76"><a id="PART_1_Project_understanding_75"></a>PART 1 — Project understanding</h1>
+<h2 class="code-line has-line-data" data-line-start="77" data-line-end="78"><a id="11_What_this_app_is_77"></a>1.1 What this app is</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App</td>
+<td>Harewa 2.0 (<code>package.json</code> name <code>harewa-2.0</code>)</td>
+</tr>
+<tr>
+<td>Path</td>
+<td><code>apps/harewa-dev</code></td>
+</tr>
+<tr>
+<td>Stack</td>
+<td>Next.js 16 App Router, React 19, Prisma 6, PostgreSQL (Supabase), custom JWT cookies</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>Email/password + Google OAuth; cookies <code>access-token</code> / <code>refresh-token</code></td>
+</tr>
+<tr>
+<td>Edge gate</td>
+<td><code>src/proxy.ts</code> (no <code>middleware.ts</code>)</td>
+</tr>
+<tr>
+<td>API guards</td>
+<td><code>src/lib/middleware/requireAuth.ts</code></td>
+</tr>
+<tr>
+<td>Tenant</td>
+<td><code>Organization</code></td>
+</tr>
+<tr>
+<td>Staff/provider link</td>
+<td><code>Membership</code></td>
+</tr>
+<tr>
+<td>Named permission sets</td>
+<td><code>RoleTemplate</code> + <code>rolePreset</code> + <code>permissionsOverride</code></td>
+</tr>
+<tr>
+<td>Capability catalog</td>
+<td><code>src/lib/auth/permissions.ts</code> (<code>P.*</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="92" data-line-end="93"><a id="12_Four_product_surfaces_92"></a>1.2 Four product surfaces</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Surface</th>
+<th>Who</th>
+<th>Pages</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Public storefront</td>
+<td>anonymous + signed-in anyone</td>
+<td><code>/home</code>, <code>/shop</code>, <code>/fabrics</code>, <code>/tailors</code>, <code>/join/[slug]</code>, legal, payment results</td>
+<td>Catalog uses <strong>storefront org</strong> (<code>DEFAULT_ORG_ID</code> / default org). Never JWT <code>orgId</code> for public shop.</td>
+</tr>
+<tr>
+<td>Customer account</td>
+<td><code>client</code> (and tailor may use profile)</td>
+<td><code>/profile/**</code></td>
+<td><code>document.user === JWT sub</code></td>
+</tr>
+<tr>
+<td>Staff console</td>
+<td>staff Membership presets</td>
+<td><code>/admin/**</code></td>
+<td><code>actor.orgId</code> + optional <code>companyWideView</code></td>
+</tr>
+<tr>
+<td>Tailor studio</td>
+<td>Membership preset <code>tailor</code></td>
+<td><code>/tailor/**</code></td>
+<td>TailorProfile ownership + <code>orgId</code> on profile</td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="101" data-line-end="102"><a id="13_Concept_map_HTML_doc_Harewa_101"></a>1.3 Concept map (HTML doc → Harewa)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Architecture doc</th>
+<th>Harewa</th>
+<th>Status at plan time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tenant / Account</td>
+<td><code>Organization</code></td>
+<td>Implemented (status only; no owner, no <code>is_approved</code>)</td>
+</tr>
+<tr>
+<td>Company Profile</td>
+<td>Not a 1:1 model</td>
+<td>Missing as ERP profile. Org has Tax/AI/Shipping settings.</td>
+</tr>
+<tr>
+<td>User belongs to exactly one Account</td>
+<td><code>User</code> has <strong>no</strong> <code>orgId</code>; Membership is optional</td>
+<td>Partial. Multi-membership allowed. Clients often have no Membership.</td>
+</tr>
+<tr>
+<td>Team Member (SubUser)</td>
+<td><code>Membership</code> on a normal <code>User</code></td>
+<td>Implemented (single login, not dual credentials)</td>
+</tr>
+<tr>
+<td>Linked User</td>
+<td>Same <code>User</code> row</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Role (AccountGroup)</td>
+<td><code>Membership.rolePreset</code> + <code>RoleTemplate</code></td>
+<td>Implemented</td>
+</tr>
+<tr>
+<td>Permission <code>module.action_resource</code></td>
+<td><code>P.*</code> strings like <code>products:read</code></td>
+<td>Implemented (Harewa naming)</td>
+</tr>
+<tr>
+<td>Company Admin</td>
+<td><code>platform_admin</code></td>
+<td>Implemented (not “owner acting as self”)</td>
+</tr>
+<tr>
+<td><code>full_company_visibility</code></td>
+<td><code>Membership.companyWideView</code></td>
+<td>Partial (exists; default true; uneven API adoption)</td>
+</tr>
+<tr>
+<td>Request company context</td>
+<td>JWT <code>orgId</code> + <code>requireActorOrgId</code> / storefront helpers</td>
+<td>Implemented</td>
+</tr>
+<tr>
+<td>Approval / profile-only gate</td>
+<td>—</td>
+<td><strong>Do not copy onto customer shop.</strong> Org <code>status</code> is <code>active</code>/<code>suspended</code>.</td>
+</tr>
+<tr>
+<td>Isolation helper</td>
+<td><code>org.ts</code> + <code>staffOrg.ts</code></td>
+<td>Partial; not one universal <code>records_visible_to</code></td>
+</tr>
+<tr>
+<td>Activity log <code>account_id</code></td>
+<td><code>ActivityLog</code> has <code>userId</code>, org only in some <code>metadata</code></td>
+<td>Partial</td>
+</tr>
+<tr>
+<td>User sessions terminate UI</td>
+<td><code>authzVersion</code> + refresh JTI revoke</td>
+<td>Partial (no session table UI)</td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="120" data-line-end="121"><a id="14_Mental_model_Harewa_after_alignment_120"></a>1.4 Mental model (Harewa, after alignment)</h2>
+<pre><code class="has-line-data" data-line-start="123" data-line-end="152">Organization  (tenant = Account)
+  ├── Membership[]     userId + orgId + rolePreset + roleTemplateId
+  │                      + permissionsOverride[] + companyWideView + status
+  ├── RoleTemplate[]   unique (orgId, name); permissions[]
+  ├── org-scoped business rows (Product, Fabric, Category, Order, TaxSettings, …)
+  └── TailorProfile[]  provider studio, orgId required
+
+User
+  ├── role: admin | client   (seller archived → treated as client)
+  ├── optional Membership(s)
+  └── user-scoped rows: Cart, Wishlist, Wallet, Profile, Notification, Customization
+      isolation: userId === JWT sub   (NOT org-scoped)
+
+JWT claims (staff/tailor with membership)
+  sub, role, preset, permissions[], orgId, membershipRole, companyWideView, av (authzVersion)
+
+Layer 1 TENANT (staff org-scoped resources):
+  WHERE orgId = actor.orgId
+  Cross-tenant → 403 &quot;Cross-tenant access denied&quot;
+
+Layer 2 VISIBILITY (when companyWideView === false AND model has owner field):
+  AND createdById/seller/user = actor.sub
+  platform_admin → always company-wide (true)
+
+Clients without Membership:
+  JWT expands from User.role → client preset (*_own permissions)
+  orgId may be null
+  storefront catalog still uses DEFAULT_ORG_ID
+</code></pre>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="155" data-line-end="156"><a id="PART_2_Complete_scope_155"></a>PART 2 — Complete scope</h1>
+<h2 class="code-line has-line-data" data-line-start="157" data-line-end="158"><a id="21_In_scope_the_feature_157"></a>2.1 In scope (the feature)</h2>
+<ol>
+<li class="has-line-data" data-line-start="159" data-line-end="160">Make Organization the explicit Account equivalent (documented + invariants).</li>
+<li class="has-line-data" data-line-start="160" data-line-end="161"><strong>Multi-company registration / onboarding:</strong> a company can register (create a new <code>Organization</code> + first <code>platform_admin</code> Membership), then manage its own <code>/admin</code> dashboard, RoleTemplates, team members, permissions (from <code>P.*</code>), and org-scoped records — isolated from every other company.</li>
+<li class="has-line-data" data-line-start="161" data-line-end="162">Harden Membership lifecycle (invite, create, edit, revoke, hard-delete, last admin).</li>
+<li class="has-line-data" data-line-start="162" data-line-end="163">Harden RoleTemplate CRUD and assign (grant ⊆ actor, org-scoped).</li>
+<li class="has-line-data" data-line-start="163" data-line-end="164">Keep <code>P.*</code> catalog, presets, nav, and <code>API_PERMISSIONS</code> in lockstep.</li>
+<li class="has-line-data" data-line-start="164" data-line-end="165">Apply <code>actor.orgId</code> on every staff-scoped resource consistently.</li>
+<li class="has-line-data" data-line-start="165" data-line-end="166">Apply <code>companyWideView=false</code> own-row filters on <strong>ownership-capable</strong> staff resources.</li>
+<li class="has-line-data" data-line-start="166" data-line-end="167">Keep user-scoped commerce isolation (<code>user === sub</code>) unchanged.</li>
+<li class="has-line-data" data-line-start="167" data-line-end="168">Keep tailor vs customer vs staff surfaces separate.</li>
+<li class="has-line-data" data-line-start="168" data-line-end="169">Put reliable org context on ActivityLog writes.</li>
+<li class="has-line-data" data-line-start="169" data-line-end="170">Sync bootstrap scripts and README with Prisma reality (bootstrap remains valid alongside self-serve registration).</li>
+<li class="has-line-data" data-line-start="170" data-line-end="172">Extend <code>yarn verify-rbac</code> for CWV + members + cross-tenant + <strong>two registered companies</strong> isolation cases.</li>
+</ol>
+<h2 class="code-line has-line-data" data-line-start="172" data-line-end="173"><a id="22_Out_of_scope_repeat_172"></a>2.2 Out of scope (repeat)</h2>
+<ul>
+<li class="has-line-data" data-line-start="174" data-line-end="175">ERP Part B modules</li>
+<li class="has-line-data" data-line-start="175" data-line-end="176">Org <strong>switcher</strong> UI (in-session hop between memberships) — registration of a <em>new</em> company is in scope; switching is not</li>
+<li class="has-line-data" data-line-start="176" data-line-end="177">SubUser dual login</li>
+<li class="has-line-data" data-line-start="177" data-line-end="178">Blocking customer storefront behind <code>is_approved</code></li>
+<li class="has-line-data" data-line-start="178" data-line-end="180">Full Company Profile / bank accounts ERP screens unless already implied by existing org settings (do <strong>not</strong> invent a new ERP module)</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="180" data-line-end="181"><a id="23_Uncertainties_do_not_silently_invent_180"></a>2.3 Uncertainties (do not silently invent)</h2>
+<ol>
+<li class="has-line-data" data-line-start="182" data-line-end="183"><strong><code>Organization.ownerUserId</code></strong>: add only if it is a non-breaking, clearly useful invariant (e.g. first <code>platform_admin</code> from company registration). Prefer documenting “Company Admin = <code>platform_admin</code> membership” if owner FK would confuse tailor + staff.</li>
+<li class="has-line-data" data-line-start="183" data-line-end="184"><strong><code>is_approved</code></strong>: do <strong>not</strong> lock the public shop. If added, it may only affect staff/org operational unlock — default is <strong>do not add</strong> unless Phase 1 analysis shows a clean fit with <code>OrgStatus</code>. New companies default to <code>status: active</code> unless a deliberate ops gate is designed.</li>
+<li class="has-line-data" data-line-start="184" data-line-end="185"><strong>Company Profile</strong>: reuse Tax/AI/Shipping; do not create a parallel branding ERP. Registration collects minimal org identity (name, slug) only.</li>
+<li class="has-line-data" data-line-start="185" data-line-end="186"><strong>Session terminate hub</strong>: Harewa already invalidates via <code>authzVersion</code> + <code>refreshTokenJTI</code>. Only add list/terminate UI if it cleanly fits <code>/admin/users</code>. Default: document existing invalidation; do not ship a half-built security hub.</li>
+<li class="has-line-data" data-line-start="186" data-line-end="188"><strong>Company registration path shape</strong>: prefer a dedicated route (e.g. <code>/register-company</code> + <code>POST /api/orgs/register</code> or <code>/api/auth/register-company</code>) separate from customer <code>/signup</code>. Do not overload customer signup with <code>role: admin</code>. Existing signed-in clients without staff Membership may be allowed to “create a company” and receive <code>platform_admin</code> on the new org — document the chosen rule in Phase 1/4.</li>
+</ol>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="188" data-line-end="189"><a id="PART_3_Dependency_analysis_188"></a>PART 3 — Dependency analysis</h1>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Depends on</th>
+<th>Used by</th>
+<th>Must remain true</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Organization</code> + <code>getStorefrontOrgId</code> / <code>DEFAULT_ORG_ID</code></td>
+<td>Public catalog, tax checkout, blacklist, homepage, ad banners</td>
+<td>Public lists never use JWT org</td>
+</tr>
+<tr>
+<td><code>Membership</code> + JWT claims</td>
+<td>proxy, staff APIs, tailor entry</td>
+<td>Fresh reload on staff mutators</td>
+</tr>
+<tr>
+<td><code>permissions.ts</code></td>
+<td><code>requirePermission*</code>, <code>can()</code>, templates, nav</td>
+<td>Codes never renamed casually</td>
+</tr>
+<tr>
+<td><code>staffOrg.ts</code></td>
+<td>Product/order/analytics/members isolation</td>
+<td>Never trust body.orgId</td>
+</tr>
+<tr>
+<td><code>memberAdmin.ts</code> / <code>roleTemplateAdmin.ts</code></td>
+<td><code>/admin/users</code></td>
+<td>Grant ⊆ actor</td>
+</tr>
+<tr>
+<td><code>User.role</code></td>
+<td>Legacy client JWT expansion</td>
+<td>Signup always <code>client</code></td>
+</tr>
+<tr>
+<td>Cart/Wishlist/Wallet</td>
+<td>Checkout</td>
+<td><code>user === sub</code>; no orgId on those models</td>
+</tr>
+<tr>
+<td>Tailor preset</td>
+<td><code>/tailor/*</code></td>
+<td>Not staff; <code>User.role</code> stays <code>client</code></td>
+</tr>
+<tr>
+<td><code>authzVersion</code></td>
+<td>Stale JWT</td>
+<td>Bump on role/status change</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="202" data-line-end="203"><strong>Reuse:</strong> Organization, Membership, RoleTemplate, P catalog, proxy, staffOrg, members APIs, Users UI, verify-rbac.</p>
+<p class="has-line-data" data-line-start="204" data-line-end="205"><strong>Extend:</strong> CWV coverage, ActivityLog.orgId, verify matrix, README honesty.</p>
+<p class="has-line-data" data-line-start="206" data-line-end="207"><strong>Modify:</strong> Uneven staff list filters; stale README (<code>client</code> as Membership preset; <code>MONGO_URI</code>).</p>
+<p class="has-line-data" data-line-start="208" data-line-end="209"><strong>Create:</strong> Only missing alignment pieces (e.g. ActivityLog.orgId column). No parallel RBAC.</p>
+<p class="has-line-data" data-line-start="210" data-line-end="211"><strong>Replace:</strong> Nothing wholesale.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="214" data-line-end="215"><a id="PART_4_Current_inventory_do_not_skip_214"></a>PART 4 — Current inventory (do not skip)</h1>
+<h2 class="code-line has-line-data" data-line-start="216" data-line-end="217"><a id="41_Prisma_models_relevant_to_RBAC_tenancy_216"></a>4.1 Prisma models relevant to RBAC / tenancy</h2>
+<p class="has-line-data" data-line-start="218" data-line-end="219"><strong>File:</strong> <code>prisma/schema.prisma</code></p>
+<h3 class="code-line has-line-data" data-line-start="220" data-line-end="221"><a id="Organization_220"></a>Organization</h3>
+<ul>
+<li class="has-line-data" data-line-start="222" data-line-end="223"><code>id</code>, <code>legacyId?</code>, <code>name</code>, <code>slug</code> unique, <code>status</code> (<code>active</code> | <code>suspended</code>), <code>isDefault</code>, timestamps</li>
+<li class="has-line-data" data-line-start="223" data-line-end="224">Relations: memberships, roleTemplates, products, categories, fabrics, orders, tax/ai/shipping settings, ad banners, homepage sections, userBlacklists, tailorProfiles, tailoringJobs, measurementCampaigns, fashionChats, shipments</li>
+<li class="has-line-data" data-line-start="224" data-line-end="226"><strong>Missing vs doc:</strong> <code>owner_user_id</code>, <code>is_approved</code>, Company Profile 1:1</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="226" data-line-end="227"><a id="Membership_226"></a>Membership</h3>
+<ul>
+<li class="has-line-data" data-line-start="228" data-line-end="229">unique <code>(userId, orgId)</code></li>
+<li class="has-line-data" data-line-start="229" data-line-end="230"><code>rolePreset</code>: <code>platform_admin</code> | <code>ops_manager</code> | <code>catalog_editor</code> | <code>finance</code> | <code>custom</code> | <code>tailor</code></li>
+<li class="has-line-data" data-line-start="230" data-line-end="231"><code>roleTemplateId?</code>, <code>permissionsOverride String[]</code>, <code>companyWideView Boolean @default(true)</code></li>
+<li class="has-line-data" data-line-start="231" data-line-end="232"><code>status</code>: <code>active</code> | <code>invited</code> | <code>suspended</code> | <code>revoked</code></li>
+<li class="has-line-data" data-line-start="232" data-line-end="234"><code>updatedById</code>, <code>invitedById</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="234" data-line-end="235"><a id="RoleTemplate_234"></a>RoleTemplate</h3>
+<ul>
+<li class="has-line-data" data-line-start="236" data-line-end="237">unique <code>(orgId, name)</code></li>
+<li class="has-line-data" data-line-start="237" data-line-end="238"><code>permissions String[]</code></li>
+<li class="has-line-data" data-line-start="238" data-line-end="240"><code>createdById</code> / <code>updatedById</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="240" data-line-end="241"><a id="User_240"></a>User</h3>
+<ul>
+<li class="has-line-data" data-line-start="242" data-line-end="243"><code>email</code> unique, <code>password?</code>, <code>role</code> <code>admin</code> | <code>seller</code> | <code>client</code> (default client)</li>
+<li class="has-line-data" data-line-start="243" data-line-end="244"><code>authzVersion Int @default(0)</code>, <code>refreshTokenJTI?</code></li>
+<li class="has-line-data" data-line-start="244" data-line-end="245"><strong>No</strong> <code>orgId</code> on User</li>
+<li class="has-line-data" data-line-start="245" data-line-end="247"><code>isVerified</code>, <code>accountDeleted</code>, Google, lastLogin fields</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="247" data-line-end="248"><a id="Profile_247"></a>Profile</h3>
+<ul>
+<li class="has-line-data" data-line-start="249" data-line-end="251">1:1 user profile (picture, bio, addresses) — <strong>not</strong> Company Profile</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="251" data-line-end="252"><a id="ActivityLog_251"></a>ActivityLog</h3>
+<ul>
+<li class="has-line-data" data-line-start="253" data-line-end="254"><code>userId?</code>, <code>action</code>, <code>entityType</code>, <code>entityId?</code>, <code>description</code>, <code>ipAddress</code>, <code>metadata Json?</code></li>
+<li class="has-line-data" data-line-start="254" data-line-end="256"><strong>No</strong> <code>orgId</code> column</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="256" data-line-end="257"><a id="Orgscoped_examples_have_orgId_256"></a>Org-scoped examples (have <code>orgId</code>)</h3>
+<p class="has-line-data" data-line-start="258" data-line-end="259">Product, Fabric, ProductCategory, Order, TaxSettings, AiSettings, AdBanner, HomepageSection, ShippingSettings, Shipment, UserBlacklist, TailorProfile, TailoringJob, MeasurementCampaign, FashionChat</p>
+<h3 class="code-line has-line-data" data-line-start="260" data-line-end="261"><a id="Userscoped_NO_orgId_do_not_force_org_filters_260"></a>User-scoped (NO orgId — do not force org filters)</h3>
+<p class="has-line-data" data-line-start="262" data-line-end="263">Cart, Wishlist, Wallet, Profile, Notification, Customization, CustomRequest, MeasurementProfile (customer-owned)</p>
+<h3 class="code-line has-line-data" data-line-start="264" data-line-end="265"><a id="Ownership_fields_used_for_CWV_ownscope_264"></a>Ownership fields used for CWV own-scope</h3>
+<ul>
+<li class="has-line-data" data-line-start="266" data-line-end="267">Product / Fabric / Category: <code>createdById</code>, Product also seller-style fields in some APIs</li>
+<li class="has-line-data" data-line-start="267" data-line-end="268">Order: <code>userId</code></li>
+<li class="has-line-data" data-line-start="268" data-line-end="269">RoleTemplate: <code>createdById</code></li>
+<li class="has-line-data" data-line-start="269" data-line-end="271">Many admin settings: org-only (no own-scope) — <strong>document as org-wide settings</strong></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="271" data-line-end="272"><a id="42_Auth_RBAC_library_files_271"></a>4.2 Auth / RBAC library files</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/lib/auth/permissions.ts</code></td>
+<td><code>P</code>, presets, catalog, <code>API_PERMISSIONS</code>, <code>resolveCompanyWideView</code>, nav maps</td>
+</tr>
+<tr>
+<td><code>src/lib/auth/claims.ts</code></td>
+<td>Normalized JWT / AuthzClaims</td>
+</tr>
+<tr>
+<td><code>src/lib/auth/routePolicy.ts</code></td>
+<td>Edge page gates</td>
+</tr>
+<tr>
+<td><code>src/lib/auth/edge-jwt.ts</code></td>
+<td>Edge JWT verify</td>
+</tr>
+<tr>
+<td><code>src/lib/auth/http-error.ts</code></td>
+<td>401/403 types</td>
+</tr>
+<tr>
+<td><code>src/lib/auth/resourcePolicy.ts</code></td>
+<td>Extra constraints (order financial fields immutable; products:delete)</td>
+</tr>
+<tr>
+<td><code>src/lib/jwt.ts</code></td>
+<td>Server JWT sign/verify</td>
+</tr>
+<tr>
+<td><code>src/lib/membership.ts</code></td>
+<td>Effective perms, primary membership, authz for user</td>
+</tr>
+<tr>
+<td><code>src/lib/membershipConstants.ts</code></td>
+<td>Presets/statuses safe for client bundle</td>
+</tr>
+<tr>
+<td><code>src/lib/org.ts</code></td>
+<td>Default/storefront org; never trust client orgId</td>
+</tr>
+<tr>
+<td><code>src/lib/staffOrg.ts</code></td>
+<td><code>requireActorOrgId</code>, <code>withStaffDataScope</code>, catalog staff vs public</td>
+</tr>
+<tr>
+<td><code>src/lib/memberAdmin.ts</code></td>
+<td>Invite/edit/revoke/hard-delete; grant ⊆ actor; last admin</td>
+</tr>
+<tr>
+<td><code>src/lib/roleTemplateAdmin.ts</code></td>
+<td>Template CRUD; subset assertions</td>
+</tr>
+<tr>
+<td><code>src/lib/adminUsers.ts</code></td>
+<td>Create user + membership</td>
+</tr>
+<tr>
+<td><code>src/lib/middleware/requireAuth.ts</code></td>
+<td><code>requireAuth</code>, <code>requirePermission</code>, <code>requirePermissionFresh</code></td>
+</tr>
+<tr>
+<td><code>src/lib/audit/activityLog.ts</code></td>
+<td>Activity + denial audit</td>
+</tr>
+<tr>
+<td><code>src/proxy.ts</code></td>
+<td>Edge matcher</td>
+</tr>
+<tr>
+<td><code>src/store/authStore.ts</code></td>
+<td>Client <code>can()</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/useAdminPermission.ts</code></td>
+<td>Admin UI gates</td>
+</tr>
+<tr>
+<td><code>src/lib/adminNav.ts</code></td>
+<td>Sidebar SSOT</td>
+</tr>
+<tr>
+<td><code>src/utils/authRedirect.ts</code></td>
+<td>Post-login paths</td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="297" data-line-end="298"><a id="43_Permission_catalog_P_do_not_rename_without_migration_297"></a>4.3 Permission catalog (<code>P.*</code>) — do not rename without migration</h2>
+<pre><code class="has-line-data" data-line-start="300" data-line-end="322">products:read|write|delete
+fabrics:read|write|delete
+categories:read|write|delete
+orders:read|manage|read_own|create_own
+customizations:read|manage|manage_own
+reviews:read|moderate|create_own
+tax:manage
+ai:manage|chats_read|chats_reply|chats_delete
+analytics:read
+uploads:write
+settings:manage
+users:read|invite|manage_roles|delete|blacklist
+deliveries:read|manage
+profile:manage_own
+cart:read|manage_own
+wallet:read_own|transact_own|read|manage
+payments:checkout_own|read
+notifications:read_own
+tailors:read|write_own|manage
+measurements:read_own|write_own
+tailoring_jobs:read_own|write_own|read|manage
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="323" data-line-end="324"><a id="Role_presets_JWT_RolePresetId_includes_client_Membership_enum_does_not_323"></a>Role presets (JWT <code>RolePresetId</code> includes <code>client</code>; Membership enum does <strong>not</strong>)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Preset</th>
+<th>Membership row?</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>platform_admin</code></td>
+<td>yes</td>
+<td>Full catalog; <strong>always</strong> <code>companyWideView=true</code></td>
+</tr>
+<tr>
+<td><code>ops_manager</code></td>
+<td>yes</td>
+<td>Orders, customizations, reviews, deliveries, AI chats, analytics, tailors/jobs</td>
+</tr>
+<tr>
+<td><code>catalog_editor</code></td>
+<td>yes</td>
+<td>Products/fabrics/categories/uploads</td>
+</tr>
+<tr>
+<td><code>finance</code></td>
+<td>yes</td>
+<td>tax, analytics, payments:read, wallet:read</td>
+</tr>
+<tr>
+<td><code>custom</code></td>
+<td>yes</td>
+<td>Empty preset; grants from template ∪ override</td>
+</tr>
+<tr>
+<td><code>tailor</code></td>
+<td>yes</td>
+<td>Provider; <strong>not staff</strong>; <code>User.role</code> stays <code>client</code></td>
+</tr>
+<tr>
+<td><code>client</code></td>
+<td><strong>no</strong></td>
+<td>JWT expansion from <code>User.role</code>; <code>*_own</code> only</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="335" data-line-end="336">Effective staff grants = <strong>template ∪ override</strong> if template present, else <strong>preset ∪ override</strong>. Overrides <strong>add</strong>, they never strip. Use <code>custom</code> when override should be the entire set.</p>
+<p class="has-line-data" data-line-start="337" data-line-end="338"><code>resolveCompanyWideView</code>: <code>platform_admin</code> → true; explicit <code>false</code> → false; otherwise default <strong>true</strong> (legacy lockout avoidance).</p>
+<h2 class="code-line has-line-data" data-line-start="339" data-line-end="340"><a id="44_Page_routes_App_Router_339"></a>4.4 Page routes (App Router)</h2>
+<h3 class="code-line has-line-data" data-line-start="341" data-line-end="342"><a id="Public_public_341"></a>Public <code>(public)</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="343" data-line-end="344"><code>/</code> (root — proxy classifies; signed-in staff → <code>/admin</code>, tailor → <code>/tailor/home</code>, else <code>/home</code>)</li>
+<li class="has-line-data" data-line-start="344" data-line-end="345"><code>/home</code>, <code>/shop</code>, <code>/shop/[slug]</code>, <code>/shop/[slug]/customize</code></li>
+<li class="has-line-data" data-line-start="345" data-line-end="346"><code>/fabrics</code>, <code>/fabrics/[id]</code></li>
+<li class="has-line-data" data-line-start="346" data-line-end="347"><code>/cart</code>, <code>/checkout</code></li>
+<li class="has-line-data" data-line-start="347" data-line-end="348"><code>/tailors</code>, <code>/tailors/[slug]</code>, <code>/tailors/[slug]/book</code></li>
+<li class="has-line-data" data-line-start="348" data-line-end="349"><code>/join/[slug]</code></li>
+<li class="has-line-data" data-line-start="349" data-line-end="350"><code>/customize</code>, <code>/trending-fashion</code></li>
+<li class="has-line-data" data-line-start="350" data-line-end="351"><code>/terms</code>, <code>/privacy</code></li>
+<li class="has-line-data" data-line-start="351" data-line-end="352"><code>/payment/success</code>, <code>/payment/callback</code>, <code>/payment/cancel</code>, <code>/payment/failure</code></li>
+<li class="has-line-data" data-line-start="352" data-line-end="353"><code>/payment/tailoring/success</code>, <code>/payment/tailoring/cancel</code></li>
+<li class="has-line-data" data-line-start="353" data-line-end="354"><code>/success</code>, <code>/cancel</code></li>
+<li class="has-line-data" data-line-start="354" data-line-end="356"><code>/clear-session</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="356" data-line-end="357"><a id="Auth_authuser_356"></a>Auth <code>(auth-user)</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="358" data-line-end="359"><code>/signin</code>, <code>/signup</code>, <code>/verify-email</code>, <code>/check-email</code></li>
+<li class="has-line-data" data-line-start="359" data-line-end="360"><code>/forgot-password</code>, <code>/reset-password</code></li>
+<li class="has-line-data" data-line-start="360" data-line-end="362"><code>/google/callback</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="362" data-line-end="363"><a id="Customer_user_362"></a>Customer <code>(user)</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="364" data-line-end="365"><code>/profile</code></li>
+<li class="has-line-data" data-line-start="365" data-line-end="366"><code>/profile/customizations/[id]</code></li>
+<li class="has-line-data" data-line-start="366" data-line-end="367"><code>/profile/tailoring-jobs</code></li>
+<li class="has-line-data" data-line-start="367" data-line-end="369"><code>/profile/tailoring-jobs/[id]</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="369" data-line-end="370"><a id="Admin_admin_staff_JWT_required_at_edge_page_still_uses_can_API_369"></a>Admin <code>(admin)</code> — staff JWT required at edge; page still uses <code>can()</code> + API</h3>
+<ul>
+<li class="has-line-data" data-line-start="371" data-line-end="372"><code>/admin</code> dashboard</li>
+<li class="has-line-data" data-line-start="372" data-line-end="373"><code>/admin/products</code>, <code>/admin/products/[id]</code></li>
+<li class="has-line-data" data-line-start="373" data-line-end="374"><code>/admin/categories</code>, <code>/admin/categories/[id]</code></li>
+<li class="has-line-data" data-line-start="374" data-line-end="375"><code>/admin/fabrics</code>, <code>/admin/fabrics/[id]</code></li>
+<li class="has-line-data" data-line-start="375" data-line-end="376"><code>/admin/orders</code>, <code>/admin/orders/[orderId]</code></li>
+<li class="has-line-data" data-line-start="376" data-line-end="377"><code>/admin/customizations</code>, <code>/admin/customizations/[id]</code></li>
+<li class="has-line-data" data-line-start="377" data-line-end="378"><code>/admin/users</code> (<strong>members + role templates + blacklist</strong>)</li>
+<li class="has-line-data" data-line-start="378" data-line-end="379"><code>/admin/permissions</code> (alias → users)</li>
+<li class="has-line-data" data-line-start="379" data-line-end="380"><code>/admin/tax-settings</code></li>
+<li class="has-line-data" data-line-start="380" data-line-end="381"><code>/admin/shipping-settings</code>, <code>/admin/settings/shipping</code></li>
+<li class="has-line-data" data-line-start="381" data-line-end="382"><code>/admin/ai-settings</code>, <code>/admin/ai-chats</code></li>
+<li class="has-line-data" data-line-start="382" data-line-end="383"><code>/admin/reviews</code></li>
+<li class="has-line-data" data-line-start="383" data-line-end="384"><code>/admin/deliveries</code>, <code>/admin/deliveries/[id]</code></li>
+<li class="has-line-data" data-line-start="384" data-line-end="385"><code>/admin/tailors</code></li>
+<li class="has-line-data" data-line-start="385" data-line-end="386"><code>/admin/tailoring-jobs</code>, <code>/admin/tailoring-jobs/[id]</code></li>
+<li class="has-line-data" data-line-start="386" data-line-end="387"><code>/admin/profile</code></li>
+<li class="has-line-data" data-line-start="387" data-line-end="388"><code>/admin/homepage-content</code></li>
+<li class="has-line-data" data-line-start="388" data-line-end="390"><code>/admin/ad-banners</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="390" data-line-end="391"><a id="Tailor_tailor_390"></a>Tailor <code>(tailor)</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="392" data-line-end="393"><code>/tailor</code> (redirect to home)</li>
+<li class="has-line-data" data-line-start="393" data-line-end="394"><code>/tailor/home</code>, <code>/tailor/dashboard</code></li>
+<li class="has-line-data" data-line-start="394" data-line-end="395"><code>/tailor/jobs</code>, <code>/tailor/jobs/[id]</code></li>
+<li class="has-line-data" data-line-start="395" data-line-end="396"><code>/tailor/campaigns</code>, <code>/tailor/campaigns/credits</code></li>
+<li class="has-line-data" data-line-start="396" data-line-end="398"><code>/tailor/notifications</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="398" data-line-end="399"><a id="Other_398"></a>Other</h3>
+<ul>
+<li class="has-line-data" data-line-start="400" data-line-end="402"><code>/403</code>, <code>/403/admin</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="402" data-line-end="403"><a id="Edge_proxy_matcher_srcproxyts_PROXY_MATCHER_402"></a>Edge proxy matcher (<code>src/proxy.ts</code> / <code>PROXY_MATCHER</code>)</h3>
+<pre><code class="has-line-data" data-line-start="405" data-line-end="412">/, /admin, /admin/:path*,
+/tailor, /tailor/:path*,
+/profile, /profile/:path*,
+/user/profile, /user/profile/:path*,
+/cart, /cart/:path*, /checkout, /checkout/:path*,
+/settings, /settings/:path*, /dashboard, /dashboard/:path*
+</code></pre>
+<p class="has-line-data" data-line-start="413" data-line-end="414"><strong>APIs are not in the matcher.</strong> Every API must self-guard.</p>
+<p class="has-line-data" data-line-start="415" data-line-end="416">Phantom prefixes <code>/settings</code> and <code>/dashboard</code> still require a session so they are not unauthenticated holes. They are <strong>not</strong> the HTML doc’s <code>/dashboard/</code> company profile.</p>
+<h2 class="code-line has-line-data" data-line-start="417" data-line-end="418"><a id="45_Admin_sidebar_srclibadminNavts_417"></a>4.5 Admin sidebar (<code>src/lib/adminNav.ts</code>)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Nav</th>
+<th>Href</th>
+<th>Typical permission</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard</td>
+<td><code>/admin</code></td>
+<td>staff (soft) / <code>analytics:read</code> for widgets</td>
+</tr>
+<tr>
+<td>Products</td>
+<td><code>/admin/products</code></td>
+<td><code>products:read</code></td>
+</tr>
+<tr>
+<td>Categories</td>
+<td><code>/admin/categories</code></td>
+<td><code>categories:read</code></td>
+</tr>
+<tr>
+<td>Fabrics</td>
+<td><code>/admin/fabrics</code></td>
+<td><code>fabrics:read</code></td>
+</tr>
+<tr>
+<td>Orders</td>
+<td><code>/admin/orders</code></td>
+<td><code>orders:read</code></td>
+</tr>
+<tr>
+<td>Customizations</td>
+<td><code>/admin/customizations</code></td>
+<td><code>customizations:read</code></td>
+</tr>
+<tr>
+<td>Deliveries</td>
+<td><code>/admin/deliveries</code></td>
+<td><code>deliveries:read</code></td>
+</tr>
+<tr>
+<td>Reviews</td>
+<td><code>/admin/reviews</code></td>
+<td><code>reviews:read</code></td>
+</tr>
+<tr>
+<td>Tailor profiles</td>
+<td><code>/admin/tailors</code></td>
+<td><code>tailors:read</code></td>
+</tr>
+<tr>
+<td>Tailoring jobs</td>
+<td><code>/admin/tailoring-jobs</code></td>
+<td><code>tailoring_jobs:read</code></td>
+</tr>
+<tr>
+<td>Conversations</td>
+<td><code>/admin/ai-chats</code></td>
+<td><code>ai:chats_read</code></td>
+</tr>
+<tr>
+<td>Assistant settings</td>
+<td><code>/admin/ai-settings</code></td>
+<td><code>ai:manage</code></td>
+</tr>
+<tr>
+<td>Users</td>
+<td><code>/admin/users</code></td>
+<td><code>users:read</code></td>
+</tr>
+<tr>
+<td>Homepage</td>
+<td><code>/admin/homepage-content</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+<tr>
+<td>Ad banners</td>
+<td><code>/admin/ad-banners</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+<tr>
+<td>Tax</td>
+<td><code>/admin/tax-settings</code></td>
+<td><code>tax:manage</code></td>
+</tr>
+<tr>
+<td>Shipping</td>
+<td><code>/admin/shipping-settings</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="439" data-line-end="440"><code>catalog_editor</code> must <strong>not</strong> see Users (no <code>users:read</code>).</p>
+<h2 class="code-line has-line-data" data-line-start="441" data-line-end="442"><a id="46_Complete_API_inventory_and_RBAC_notes_441"></a>4.6 Complete API inventory and RBAC notes</h2>
+<h3 class="code-line has-line-data" data-line-start="443" data-line-end="444"><a id="Auth_apiauth_443"></a>Auth (<code>/api/auth/*</code>)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Guard</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/signup</code></td>
+<td>public + rate limit</td>
+<td>Always <code>User.role=client</code>. Ignore body.role. No Membership. Blacklist check vs storefront org.</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/login</code></td>
+<td>public</td>
+<td>User credentials; embed authz from primary membership or client expansion</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/logout</code></td>
+<td>session</td>
+<td>Clear cookies</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/refresh</code></td>
+<td>refresh cookie</td>
+<td>Fail if authzVersion/JTI stale</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/auth/me</code></td>
+<td>requireAuth</td>
+<td>Primary authz + <code>memberships[]</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/verify</code></td>
+<td>public</td>
+<td>Email verify</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/resend</code></td>
+<td>public</td>
+<td>Resend code</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/forgot-password</code></td>
+<td>public</td>
+<td></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/reset-password</code></td>
+<td>reset token</td>
+<td></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/change-password</code></td>
+<td>auth</td>
+<td>Invalidate sessions</td>
+</tr>
+<tr>
+<td>GET/PUT</td>
+<td><code>/api/auth/profile</code></td>
+<td>auth</td>
+<td>Session profile only</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/auth/profile/picture</code></td>
+<td>auth</td>
+<td>Session only</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/auth/profile/address/[addressId]</code></td>
+<td>auth</td>
+<td>Session only</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/auth/google</code></td>
+<td>public</td>
+<td>OAuth start</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/auth/google/callback</code></td>
+<td>public</td>
+<td>Always client role</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="463" data-line-end="464"><a id="Members_users_templates_blacklist_core_of_this_feature_463"></a>Members / users / templates / blacklist (core of this feature)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Permission</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/admin/members</code></td>
+<td><code>users:read</code> Fresh</td>
+<td><code>actor.orgId</code>; CWV=false → self only</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/admin/members</code></td>
+<td><code>users:invite</code> or <code>users:manage_roles</code></td>
+<td>Stamp actor.orgId; grants ⊆ actor; CWV ⊆ actor</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/admin/members/[id]</code></td>
+<td><code>users:manage_roles</code></td>
+<td>Same org; last platform_admin protected; bump authzVersion</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/admin/members/[id]</code></td>
+<td><code>users:manage_roles</code> (soft revoke)</td>
+<td>Last admin protected</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/admin/members/[id]?hard=1</code></td>
+<td><code>users:delete</code> + platform_admin</td>
+<td>No self-delete; other orgs → revoke instead</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/admin/users</code></td>
+<td><code>users:manage_roles</code></td>
+<td>Create User+Profile+wallet+Membership in actor.orgId</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/admin/role-templates</code></td>
+<td><code>users:read</code></td>
+<td>actor.orgId</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/admin/role-templates</code></td>
+<td><code>users:manage_roles</code></td>
+<td>unique name; perms ⊆ actor</td>
+</tr>
+<tr>
+<td>GET/PATCH/DELETE</td>
+<td><code>/api/admin/role-templates/[id]</code></td>
+<td>read / manage_roles</td>
+<td>org-scoped; delete blocked if assigned</td>
+</tr>
+<tr>
+<td>GET/POST</td>
+<td><code>/api/admin/user-blacklist</code></td>
+<td><code>users:blacklist</code></td>
+<td>actor.orgId</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/admin/user-blacklist/[id]</code></td>
+<td><code>users:blacklist</code></td>
+<td>actor.orgId</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="479" data-line-end="480">Messages already in code:</p>
+<ul>
+<li class="has-line-data" data-line-start="481" data-line-end="482"><code>Cannot remove or demote the last platform_admin in this organization</code></li>
+<li class="has-line-data" data-line-start="482" data-line-end="483"><code>Cannot grant permissions beyond your own</code></li>
+<li class="has-line-data" data-line-start="483" data-line-end="484"><code>Membership not found</code></li>
+<li class="has-line-data" data-line-start="484" data-line-end="485"><code>You cannot permanently delete your own account from here</code></li>
+<li class="has-line-data" data-line-start="485" data-line-end="486"><code>This user still belongs to another organization. Revoke this membership instead of deleting the account.</code></li>
+<li class="has-line-data" data-line-start="486" data-line-end="487"><code>Cross-tenant access denied</code></li>
+<li class="has-line-data" data-line-start="487" data-line-end="489"><code>Organization membership required</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="489" data-line-end="490"><a id="Catalog_dual_public_vs_staff_489"></a>Catalog (dual public vs staff)</h3>
+<p class="has-line-data" data-line-start="491" data-line-end="492">Public GET uses <code>storefrontOrgFilter()</code>. Staff uses <code>?scope=staff</code> + Fresh + <code>actor.orgId</code>. Never <code>body.orgId</code>.</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Permission</th>
+<th>Tenancy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/product</code></td>
+<td>public or <code>products:read</code> if staff scope</td>
+<td>storefront vs actor.orgId; CWV own-scope via <code>resolveStaffCatalogListFilter</code> (seller)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/product</code></td>
+<td><code>products:write</code> Fresh</td>
+<td>stamp actor.orgId</td>
+</tr>
+<tr>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/product/[id]</code></td>
+<td>read/write/delete</td>
+<td>actor.orgId; CWV may gate own rows on staff path</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/product/bulk</code></td>
+<td><code>products:write</code></td>
+<td>actor.orgId</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/product/seller/[id]</code></td>
+<td>staff</td>
+<td>org + seller</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/product/shop/[id]</code></td>
+<td></td>
+<td>legacy shop — <code>/api/shop</code> is 410 Gone conceptually</td>
+</tr>
+<tr>
+<td>GET/POST</td>
+<td><code>/api/fabric</code></td>
+<td>public / <code>fabrics:write</code></td>
+<td><strong>Phase 2:</strong> confirm CWV own-scope if createdById exists</td>
+</tr>
+<tr>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/fabric/[id]</code></td>
+<td>fabrics:*</td>
+<td>actor.orgId cross-tenant 403</td>
+</tr>
+<tr>
+<td>GET/POST</td>
+<td><code>/api/product-category</code></td>
+<td>public / <code>categories:write</code></td>
+<td><strong>Phase 2:</strong> same</td>
+</tr>
+<tr>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/product-category/[id]</code></td>
+<td>categories:*</td>
+<td>actor.orgId</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/product/category/[id]</code></td>
+<td>public</td>
+<td>storefront</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="507" data-line-end="508"><a id="Orders_analytics_507"></a>Orders / analytics</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Permission</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/order</code></td>
+<td><code>orders:read</code> Fresh (staff)</td>
+<td><code>withStaffDataScope</code> → <code>{ user: sub }</code> when CWV false</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/order</code></td>
+<td>auth / create_own</td>
+<td>stamp Order.orgId from storefront or policy; user=sub</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/order/me</code></td>
+<td>auth</td>
+<td>own orders only</td>
+</tr>
+<tr>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/order/[id]</code></td>
+<td>own or <code>orders:read/manage</code></td>
+<td>org match; financial fields immutable on PUT</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/analytics</code></td>
+<td><code>analytics:read</code> Fresh</td>
+<td>actor.orgId; CWV own-scope userId/sellerId</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="517" data-line-end="518"><a id="Userscoped_commerce_do_not_add_org_tenancy_517"></a>User-scoped commerce (do not add org tenancy)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/cart</code>, <code>/api/cart/me</code>, <code>/api/cart/[id]*</code></td>
+<td><code>user === sub</code>; staff list-all is <strong>org-blind</strong> (<code>cart:read</code>) — ACCEPTED</td>
+</tr>
+<tr>
+<td><code>/api/wishlist</code></td>
+<td>user === sub</td>
+</tr>
+<tr>
+<td><code>/api/wallet</code>, <code>/me</code>, <code>/fund</code>, <code>/withdraw</code>, <code>/[id]</code>, reciept</td>
+<td>user === sub; staff list <code>wallet:read</code> org-blind</td>
+</tr>
+<tr>
+<td><code>/api/customization</code>, <code>/me</code>, <code>/[id]</code>, <code>/user/[userId]</code></td>
+<td>user isolation; staff list org-blind</td>
+</tr>
+<tr>
+<td><code>/api/notification</code></td>
+<td>user === sub</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="527" data-line-end="528"><a id="Payments_do_not_change_policy_527"></a>Payments (do not change policy)</h3>
+<ul>
+<li class="has-line-data" data-line-start="529" data-line-end="530">Stripe UI on; Paystack UI off; wallet API-only (<code>PAYMENT_POLICY</code>)</li>
+<li class="has-line-data" data-line-start="530" data-line-end="531"><code>/api/payment/stripe/create-session</code>, <code>/confirm</code></li>
+<li class="has-line-data" data-line-start="531" data-line-end="532"><code>/api/payment/paystack/*</code> API-only</li>
+<li class="has-line-data" data-line-start="532" data-line-end="533"><code>/api/payment/tailoring*</code></li>
+<li class="has-line-data" data-line-start="533" data-line-end="534"><code>/api/webhooks/stripe</code></li>
+<li class="has-line-data" data-line-start="534" data-line-end="536"><code>/api/payment/purchase</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="536" data-line-end="537"><a id="Settings_orgwide_typically_no_CWV_ownscope_536"></a>Settings (org-wide; typically <strong>no</strong> CWV own-scope)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Permission</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/admin/tax-settings</code></td>
+<td><code>tax:manage</code> Fresh, actor.orgId</td>
+</tr>
+<tr>
+<td><code>/api/tax-settings</code></td>
+<td>public storefront tax</td>
+</tr>
+<tr>
+<td><code>/api/admin/ai-settings</code></td>
+<td><code>ai:manage</code></td>
+</tr>
+<tr>
+<td><code>/api/ai-settings</code></td>
+<td>public/client as currently implemented</td>
+</tr>
+<tr>
+<td><code>/api/admin/shipping-settings</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+<tr>
+<td><code>/api/admin/homepage-content</code>, <code>/[key]</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+<tr>
+<td><code>/api/homepage-content</code></td>
+<td>public</td>
+</tr>
+<tr>
+<td><code>/api/admin/ad-banners</code>, <code>/[id]</code></td>
+<td><code>settings:manage</code></td>
+</tr>
+<tr>
+<td><code>/api/ad-banners</code></td>
+<td>public</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="550" data-line-end="551"><a id="Tailors_jobs_campaigns_measurements_550"></a>Tailors / jobs / campaigns / measurements</h3>
+<p class="has-line-data" data-line-start="552" data-line-end="553">Admin (staff, actor.orgId):</p>
+<ul>
+<li class="has-line-data" data-line-start="554" data-line-end="555"><code>/api/admin/tailors</code>, <code>/api/admin/tailors/[id]</code> — <code>tailors:read</code> / <code>tailors:manage</code></li>
+<li class="has-line-data" data-line-start="555" data-line-end="557"><code>/api/admin/tailoring-jobs</code>, <code>/[id]</code> — <code>tailoring_jobs:read</code> / <code>manage</code></li>
+</ul>
+<p class="has-line-data" data-line-start="557" data-line-end="558">Public discovery:</p>
+<ul>
+<li class="has-line-data" data-line-start="559" data-line-end="561"><code>/api/tailors</code>, <code>/api/tailors/[slug]</code>, reviews</li>
+</ul>
+<p class="has-line-data" data-line-start="561" data-line-end="562">Provider studio (<code>tailor</code> preset, own TailorProfile):</p>
+<ul>
+<li class="has-line-data" data-line-start="563" data-line-end="564"><code>/api/tailor/me</code>, <code>/portfolio</code>, <code>/clients</code>, <code>/clients/[id]</code></li>
+<li class="has-line-data" data-line-start="564" data-line-end="566"><code>/api/tailor/campaigns</code>, <code>/[id]</code>, participants, export, credits, media</li>
+</ul>
+<p class="has-line-data" data-line-start="566" data-line-end="567">Customer:</p>
+<ul>
+<li class="has-line-data" data-line-start="568" data-line-end="569"><code>/api/tailoring-jobs</code>, <code>/[id]</code>, reference-images — <code>tailoring_jobs:*_own</code> + owner</li>
+<li class="has-line-data" data-line-start="569" data-line-end="570"><code>/api/measurement-profiles*</code> — <code>measurements:*_own</code> + owner</li>
+<li class="has-line-data" data-line-start="570" data-line-end="572"><code>/api/campaigns/join/[slug]</code>, <code>/api/campaigns/my*</code></li>
+</ul>
+<p class="has-line-data" data-line-start="572" data-line-end="573"><strong>Phase 2 note:</strong> Do not force staff CWV semantics onto tailor-owned roster APIs. Tailor isolation is profile ownership, not <code>companyWideView</code>.</p>
+<h3 class="code-line has-line-data" data-line-start="574" data-line-end="575"><a id="Other_574"></a>Other</h3>
+<ul>
+<li class="has-line-data" data-line-start="576" data-line-end="577"><code>/api/admin/fashion-chats*</code> — <code>ai:chats_*</code>, actor.orgId; CWV check exists in some paths</li>
+<li class="has-line-data" data-line-start="577" data-line-end="578"><code>/api/fashion-chat*</code> — guest/user chats (ACCEPTED unauthenticated mutators per README for guest start)</li>
+<li class="has-line-data" data-line-start="578" data-line-end="579"><code>/api/reviews</code>, <code>/[id]</code> — moderate requires org of related product</li>
+<li class="has-line-data" data-line-start="579" data-line-end="580"><code>/api/shipping/*</code>, <code>/api/webhooks/shipping/*</code> — deliveries permissions + provider secrets</li>
+<li class="has-line-data" data-line-start="580" data-line-end="581"><code>/api/upload*</code> — <code>uploads:write</code></li>
+<li class="has-line-data" data-line-start="581" data-line-end="582"><code>/api/client-sync</code> — existing client sync, not doc <code>/api/v1/</code></li>
+<li class="has-line-data" data-line-start="582" data-line-end="583"><code>/api/shop</code>, <code>/api/shop/[id]</code> — 410 Gone / legacy; tenant is Organization not Shop</li>
+<li class="has-line-data" data-line-start="583" data-line-end="584"><code>/api/custom-request</code></li>
+<li class="has-line-data" data-line-start="584" data-line-end="586"><code>/api/notification</code></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="586" data-line-end="587"><a id="47_Frontend_services_hooks_for_members_admin_586"></a>4.7 Frontend / services / hooks for members admin</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/components/Protected/admin/pages/users/UsersPermissionsPage.tsx</code></td>
+<td>List, view, edit, invite, CWV checkbox</td>
+</tr>
+<tr>
+<td><code>CreateUserModal.tsx</code></td>
+<td>Create user + membership</td>
+</tr>
+<tr>
+<td><code>RoleTemplatesPanel.tsx</code></td>
+<td>Template CRUD</td>
+</tr>
+<tr>
+<td><code>PermissionGrantList.tsx</code></td>
+<td>Override checkboxes ⊆ actor</td>
+</tr>
+<tr>
+<td><code>UserBlacklistPanel.tsx</code></td>
+<td>Blacklist</td>
+</tr>
+<tr>
+<td><code>src/services/members.ts</code></td>
+<td>Client API wrapper</td>
+</tr>
+<tr>
+<td><code>src/hooks/useMembers.ts</code>, <code>useRoleTemplates.ts</code></td>
+<td>React Query</td>
+</tr>
+<tr>
+<td>Admin layout / sidebar</td>
+<td><code>can()</code> + <code>permissionForAdminPath</code></td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="599" data-line-end="600"><a id="48_Scripts_599"></a>4.8 Scripts</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Script</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>yarn ensure-default-org</code></td>
+<td>Bootstrap Harewa org, <code>isDefault</code></td>
+</tr>
+<tr>
+<td><code>yarn create-admin &lt;email&gt; &lt;password&gt;</code></td>
+<td>User.role=admin + <code>platform_admin</code> membership on default org</td>
+</tr>
+<tr>
+<td><code>yarn ensure-memberships</code></td>
+<td>Backfill admin memberships; archive seller → client</td>
+</tr>
+<tr>
+<td><code>yarn repair-admin-memberships</code></td>
+<td>Repair</td>
+</tr>
+<tr>
+<td><code>yarn ensure-second-org</code></td>
+<td><code>other-org</code> fixture for cross-tenant tests</td>
+</tr>
+<tr>
+<td><code>yarn verify-rbac</code></td>
+<td>Matrix A–I (extend in Phase 5)</td>
+</tr>
+<tr>
+<td><code>yarn restore-rbac-matrix-memberships</code></td>
+<td>Restore matrix fixtures</td>
+</tr>
+</tbody>
+</table>
+<h2 class="code-line has-line-data" data-line-start="611" data-line-end="612"><a id="49_Request_pipeline_Harewa_vs_doc_611"></a>4.9 Request pipeline (Harewa vs doc)</h2>
+<p class="has-line-data" data-line-start="613" data-line-end="614">Doc order: session → auth → company context → approval gate → audit.</p>
+<p class="has-line-data" data-line-start="615" data-line-end="616">Harewa:</p>
+<ol>
+<li class="has-line-data" data-line-start="617" data-line-end="618">Browser hits page → <code>src/proxy.ts</code> verifies access-token (edge, no DB)</li>
+<li class="has-line-data" data-line-start="618" data-line-end="619">Page uses <code>authStore.can()</code> for UI</li>
+<li class="has-line-data" data-line-start="619" data-line-end="620">API: cookie JWT → <code>requireAuth</code> (sync) or <code>requirePermissionFresh</code> (reload Membership)</li>
+<li class="has-line-data" data-line-start="620" data-line-end="621">Staff: <code>requireActorOrgId</code> then filter/stamp</li>
+<li class="has-line-data" data-line-start="621" data-line-end="623">Errors: <code>authErrorToResponse</code> + optional ActivityLog denial</li>
+</ol>
+<p class="has-line-data" data-line-start="623" data-line-end="624">There is <strong>no</strong> AccountApprovalMiddleware. Do not add a gate that 403s <code>/shop</code> for unapproved orgs.</p>
+<h2 class="code-line has-line-data" data-line-start="625" data-line-end="626"><a id="410_Isolation_matrix_at_plan_time_Phase_2_must_finish_this_625"></a>4.10 Isolation matrix at plan time (Phase 2 must finish this)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Resource</th>
+<th>Tenant</th>
+<th>CWV own-scope today</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product list staff</td>
+<td>actor.orgId</td>
+<td>yes (<code>resolveStaffCatalogListFilter</code> / seller)</td>
+<td>keep + verify detail-by-id</td>
+</tr>
+<tr>
+<td>Product [id] staff</td>
+<td>actor.orgId</td>
+<td>yes (sellerId or createdById + <code>resolveCatalogAccess</code>)</td>
+<td>list/detail/mutate same rules</td>
+</tr>
+<tr>
+<td>Fabric / category</td>
+<td>actor.orgId</td>
+<td>yes (<code>createdById</code> own-scope)</td>
+<td>keep list/detail/mutate aligned</td>
+</tr>
+<tr>
+<td>Order list staff</td>
+<td>actor.orgId</td>
+<td>yes (<code>user: sub</code>)</td>
+<td>keep</td>
+</tr>
+<tr>
+<td>Order [id]</td>
+<td>org + permission</td>
+<td>yes (CWV via <code>assertOwnedDocument</code> + Fresh GET)</td>
+<td>aligned with list; owner path unchanged</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>actor.orgId</td>
+<td>orders/products/activity yes; job totals org-wide</td>
+<td>keep + document job exception</td>
+</tr>
+<tr>
+<td>Members</td>
+<td>actor.orgId</td>
+<td>yes (self if CWV false; invite others needs CWV)</td>
+<td>keep</td>
+</tr>
+<tr>
+<td>Tax/AI/shipping/homepage/ads</td>
+<td>actor.orgId</td>
+<td>no (org settings)</td>
+<td><strong>keep org-only</strong> (document exception)</td>
+</tr>
+<tr>
+<td>Admin tailors/jobs</td>
+<td>actor.orgId</td>
+<td>typically org-only</td>
+<td>document; don’t invent createdBy filters unless fields exist</td>
+</tr>
+<tr>
+<td>Fashion chats admin</td>
+<td>actor.orgId</td>
+<td>yes (assignee/CWV helper + stats)</td>
+<td>keep</td>
+</tr>
+<tr>
+<td>Shipments / deliveries</td>
+<td>actor.orgId</td>
+<td>yes (order.<code>userId</code> when CWV false)</td>
+<td>align with staff orders</td>
+</tr>
+<tr>
+<td>Cart/wallet/customization staff list</td>
+<td>none</td>
+<td>CWV check exists</td>
+<td><strong>keep org-blind</strong> (models have no orgId)</td>
+</tr>
+<tr>
+<td>Public catalog</td>
+<td>storefront org</td>
+<td>n/a</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Customer cart/order/me</td>
+<td>user=sub</td>
+<td>n/a</td>
+<td>unchanged</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="643" data-line-end="644">Safe default from the doc: model without <code>created_by</code> → non-admin sees empty. <strong>Harewa exception:</strong> org-wide settings (one row per org) are visible to any staff with the feature permission <strong>even if</strong> CWV is false — otherwise finance could not open tax. Document this exception in Phase 2.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="647" data-line-end="648"><a id="PART_5_Workflows_Cursor_must_preserve_harden_647"></a>PART 5 — Workflows Cursor must preserve / harden</h1>
+<h2 class="code-line has-line-data" data-line-start="649" data-line-end="650"><a id="51_Customer_signup_649"></a>5.1 Customer signup</h2>
+<p class="has-line-data" data-line-start="651" data-line-end="659">BEFORE: storefront org exists (ensure-default-org).<br>
+START: POST <code>/api/auth/signup</code>.<br>
+DURING: blacklist check; hash password; <code>role: client</code>; no Membership.<br>
+SUCCESS: verification email.<br>
+FAILURE: 400 duplicate / 403 blacklisted.<br>
+REPEAT: existing email 400.<br>
+SECURITY: ignore body.role.<br>
+CONSISTENCY: still no staff access.</p>
+<h2 class="code-line has-line-data" data-line-start="660" data-line-end="661"><a id="52_Create_admin_bootstrap_660"></a>5.2 Create admin (bootstrap)</h2>
+<p class="has-line-data" data-line-start="662" data-line-end="665"><code>yarn ensure-default-org</code> then <code>yarn create-admin</code>.<br>
+Creates <code>platform_admin</code> Membership on default org, CWV true.<br>
+This remains the ops path for the <strong>storefront / default</strong> Harewa org — <strong>scripts, not middleware</strong>. Self-serve company registration (§5.2b) is the product path for additional companies.</p>
+<h2 class="code-line has-line-data" data-line-start="666" data-line-end="667"><a id="52b_Company_registration_onboarding_666"></a>5.2b Company registration / onboarding (IN SCOPE)</h2>
+<p class="has-line-data" data-line-start="668" data-line-end="678">BEFORE: rate limits; customer <code>/signup</code> stays customer-only.<br>
+START: dedicated company registration (page + API) — not customer <code>/api/auth/signup</code>.<br>
+DURING (single transaction preferred):<br>
+1. Create or link <code>User</code> (email unique; password hashed; verification policy as decided in Phase 4).<br>
+2. Create <code>Organization</code>: unique <code>slug</code>, <code>status: active</code>, <code>isDefault: false</code> (never claim the storefront default org).<br>
+3. Create <code>Membership</code>: <code>rolePreset: platform_admin</code>, <code>companyWideView: true</code>, <code>status: active</code>.<br>
+4. Issue JWT with that membership as primary (<code>orgId</code> = new org).<br>
+SUCCESS: redirect to <code>/admin</code> — company can create RoleTemplates, invite team, manage own records.<br>
+FAILURE: 400 duplicate email/slug; 403 blacklisted.<br>
+SECURITY: server generates org id; never trust client <code>orgId</code>; grants come from <code>platform_admin</code> preset only at birth.<br>
+ISOLATION: Company B’s staff never see Company A’s rows (Phase 2 filters).<br>
+OUT: no in-session org switcher.</p>
+<h2 class="code-line has-line-data" data-line-start="679" data-line-end="680"><a id="53_Login_679"></a>5.3 Login</h2>
+<p class="has-line-data" data-line-start="668" data-line-end="673">Authenticate User. Resolve primary membership (<code>storefront org</code> active, else oldest active).<br>
+If tailor preset → default <code>/tailor/home</code>.<br>
+If staff → <code>/admin</code>.<br>
+Else → <code>/home</code>.<br>
+Set JWT: permissions, orgId, companyWideView, authzVersion.</p>
+<p class="has-line-data" data-line-start="674" data-line-end="675">Suspended/revoked/invited must <strong>not</strong> fall back to full admin via <code>User.role</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="676" data-line-end="677"><a id="54_Invite_member_676"></a>5.4 Invite member</h2>
+<p class="has-line-data" data-line-start="678" data-line-end="682">Admin POST <code>/api/admin/members</code> with email, preset, optional template, override, CWV.<br>
+Grants ⊆ actor. Cannot grant CWV if actor lacks it.<br>
+Creates/links User + Membership. Invited status sends email.<br>
+List always scoped to <code>actor.orgId</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="683" data-line-end="684"><a id="55_Edit_role_683"></a>5.5 Edit role</h2>
+<p class="has-line-data" data-line-start="685" data-line-end="688">PATCH member. Exact permission replace via preset/template/override (no auto-adding dependency perms).<br>
+Bump <code>authzVersion</code>, clear refresh JTI. Target must re-login.<br>
+Editing <strong>self</strong> should force logout (existing UI behavior).</p>
+<h2 class="code-line has-line-data" data-line-start="689" data-line-end="690"><a id="56_Revoke_hard_delete_689"></a>5.6 Revoke / hard delete</h2>
+<p class="has-line-data" data-line-start="691" data-line-end="693">Soft revoke: status <code>revoked</code>, invalidate sessions.<br>
+Hard delete: platform_admin + <code>users:delete</code>; blacklist email/phone; refuse if user has other org memberships.</p>
+<h2 class="code-line has-line-data" data-line-start="694" data-line-end="695"><a id="57_Staff_catalog_write_694"></a>5.7 Staff catalog write</h2>
+<p class="has-line-data" data-line-start="696" data-line-end="699">POST product: <code>stampActorOrgId</code>, set createdBy from actor, never body.orgId.<br>
+GET <code>?scope=staff</code>: actor.orgId + CWV own-scope.<br>
+Public GET: storefront org only.</p>
+<h2 class="code-line has-line-data" data-line-start="700" data-line-end="701"><a id="58_Crosstenant_700"></a>5.8 Cross-tenant</h2>
+<p class="has-line-data" data-line-start="702" data-line-end="703">Admin of org A requesting org B product/order id → <strong>403</strong>, not 200 with leaked data. Prefer 403 <code>Cross-tenant access denied</code> (existing). Do not leak existence via mismatched 404 unless that is already the route’s pattern — stay consistent per route.</p>
+<h2 class="code-line has-line-data" data-line-start="704" data-line-end="705"><a id="59_Tailor_vs_staff_704"></a>5.9 Tailor vs staff</h2>
+<p class="has-line-data" data-line-start="706" data-line-end="707">Tailor Membership: not <code>isStaffPreset</code>. Proxy allows <code>/tailor/*</code>. Staff may preview tailor pages; APIs still enforce TailorProfile ownership for edits. Admin <code>/api/admin/tailors*</code> uses actor.orgId.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="710" data-line-end="711"><a id="PART_6_Fivephase_roadmap_maximum_5_710"></a>PART 6 — Five-phase roadmap (maximum 5)</h1>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>One-line objective</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Tenant foundation &amp; Account→Organization contract</td>
+<td>SSOT mapping, org invariants, ActivityLog org context, primary membership policy, <strong>company registration contract + createOrg helper</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Staff tenancy &amp; companyWideView isolation</td>
+<td>Every staff path tenant-filtered; CWV own-scope consistent (multi-company isolation)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Members admin, RoleTemplates &amp; permission catalog</td>
+<td>Privilege boundaries, UI/API lockstep (each company manages own team/roles)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Security, bootstrap, <strong>company onboarding</strong> &amp; cross-feature RBAC</td>
+<td>Auth lifecycle, scripts, <strong>register-company UI/API</strong>, staff/tailor/client gates</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Verification, docs &amp; production readiness</td>
+<td>verify-rbac extended (incl. two companies), README honest, final audit</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="720" data-line-end="721">Execution order:</p>
+<pre><code class="has-line-data" data-line-start="723" data-line-end="725">PHASE 1 → AUDIT 1 → PHASE 2 → AUDIT 2 → PHASE 3 → AUDIT 3 → PHASE 4 → AUDIT 4 → PHASE 5 → AUDIT 5 → FINAL
+</code></pre>
+<p class="has-line-data" data-line-start="726" data-line-end="727">Each new phase <strong>verifies the previous</strong>, <strong>fixes gaps</strong>, then implements.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="730" data-line-end="731"><a id="PART_7_Phase_1_detail_730"></a>PART 7 — Phase 1 detail</h1>
+<h2 class="code-line has-line-data" data-line-start="732" data-line-end="733"><a id="PHASE_NAME_732"></a>PHASE NAME</h2>
+<p class="has-line-data" data-line-start="734" data-line-end="735">Tenant foundation &amp; Account→Organization contract</p>
+<h2 class="code-line has-line-data" data-line-start="736" data-line-end="737"><a id="PHASE_OBJECTIVE_736"></a>PHASE OBJECTIVE</h2>
+<p class="has-line-data" data-line-start="738" data-line-end="739">Make Organization the documented Account equivalent with safe schema/helpers, define the multi-company registration contract, without building ERP Company Profile, org switcher, or locking the storefront.</p>
+<h2 class="code-line has-line-data" data-line-start="740" data-line-end="741"><a id="FEATURES_INCLUDED_740"></a>FEATURES INCLUDED</h2>
+<ul>
+<li class="has-line-data" data-line-start="742" data-line-end="743">Written Account→Organization map in README + targeted code comments</li>
+<li class="has-line-data" data-line-start="743" data-line-end="744">Organization invariants: <code>status</code>, <code>isDefault</code>, slug uniqueness; optional <code>ownerUserId</code> only if analysis says yes</li>
+<li class="has-line-data" data-line-start="744" data-line-end="745"><strong>Company registration contract</strong> documented (workflow §5.2b): new org never <code>isDefault</code>; first Membership is <code>platform_admin</code> + CWV true; storefront catalog remains <code>DEFAULT_ORG_ID</code></li>
+<li class="has-line-data" data-line-start="745" data-line-end="746">Reusable server helper (e.g. <code>createOrganizationWithPlatformAdmin</code>) used later by Phase 4 UI/API and optionally by scripts — no half-wired public page required yet in Phase 1</li>
+<li class="has-line-data" data-line-start="746" data-line-end="747">ActivityLog reliable org context (<code>orgId</code> column <strong>or</strong> mandatory metadata SSOT — pick one and use it on new writes)</li>
+<li class="has-line-data" data-line-start="747" data-line-end="748">Primary membership policy documented and enforced for JWT (no org switcher; newly registered company admin’s primary = that new org)</li>
+<li class="has-line-data" data-line-start="748" data-line-end="749">Client-without-membership remains valid; customer <code>/signup</code> unchanged</li>
+<li class="has-line-data" data-line-start="749" data-line-end="750">Suspended org behavior defined (staff APIs fail closed if org suspended — if not already)</li>
+<li class="has-line-data" data-line-start="750" data-line-end="752">No ERP models</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="752" data-line-end="753"><a id="TECHNICAL_IMPLEMENTATION_752"></a>TECHNICAL IMPLEMENTATION</h2>
+<ol>
+<li class="has-line-data" data-line-start="754" data-line-end="755">Inspect <code>schema.prisma</code> Organization / Membership / ActivityLog / User.</li>
+<li class="has-line-data" data-line-start="755" data-line-end="756">Decide owner FK vs “platform_admin is Company Admin” (document the decision in README).</li>
+<li class="has-line-data" data-line-start="756" data-line-end="757">If adding <code>ActivityLog.orgId</code>: Prisma migration; update <code>logActivityEntry</code> / denial audit to stamp actor.orgId when present.</li>
+<li class="has-line-data" data-line-start="757" data-line-end="758">Review <code>resolvePrimaryMembership</code> — storefront-first, then oldest active. Document multi-membership: JWT uses primary only; members admin is per actor.orgId. Document how registration sets primary to the new org.</li>
+<li class="has-line-data" data-line-start="758" data-line-end="759">Add/extend org creation helper: unique slug, <code>isDefault: false</code>, first <code>platform_admin</code> Membership, ActivityLog with org context. Reuse from Phase 4 registration API.</li>
+<li class="has-line-data" data-line-start="759" data-line-end="760">Ensure <code>stampStorefrontOrgId</code> / <code>stampActorOrgId</code> remain the only org stampers for business rows; registration creates the tenant itself server-side.</li>
+<li class="has-line-data" data-line-start="760" data-line-end="762">Do not add <code>is_approved</code> middleware that 403s <code>/shop</code>. Do not ship org switcher.</li>
+</ol>
+<h2 class="code-line has-line-data" data-line-start="762" data-line-end="763"><a id="PROJECT_COMPONENTS_762"></a>PROJECT COMPONENTS</h2>
+<p class="has-line-data" data-line-start="764" data-line-end="765">Create/modify/reuse:</p>
+<ul>
+<li class="has-line-data" data-line-start="766" data-line-end="767"><code>prisma/schema.prisma</code> (+ migration if columns added)</li>
+<li class="has-line-data" data-line-start="767" data-line-end="768"><code>src/lib/org.ts</code>, <code>src/lib/models/Organization.ts</code> (+ registration helper module if cleaner)</li>
+<li class="has-line-data" data-line-start="768" data-line-end="769"><code>src/lib/membership.ts</code></li>
+<li class="has-line-data" data-line-start="769" data-line-end="770"><code>src/lib/audit/activityLog.ts</code></li>
+<li class="has-line-data" data-line-start="770" data-line-end="771"><code>README.md</code> (Organization / mapping / company registration contract)</li>
+<li class="has-line-data" data-line-start="771" data-line-end="773">This execution file’s status notes if you add a “Phase 1 done” checklist in README only (do not duplicate systems)</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="773" data-line-end="774"><a id="DATA_773"></a>DATA</h2>
+<ul>
+<li class="has-line-data" data-line-start="775" data-line-end="776">Organization rows: default Harewa org + additional companies via registration helper</li>
+<li class="has-line-data" data-line-start="776" data-line-end="777">ActivityLog: orgId or metadata.orgId</li>
+<li class="has-line-data" data-line-start="777" data-line-end="779">Membership still unique (userId, orgId)</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="779" data-line-end="780"><a id="BACKEND_779"></a>BACKEND</h2>
+<p class="has-line-data" data-line-start="781" data-line-end="782">Helpers + registration contract. Public register-company UI/API may wait until Phase 4 if helper is solid and tested via unit/script call.</p>
+<h2 class="code-line has-line-data" data-line-start="783" data-line-end="784"><a id="FRONTEND_783"></a>FRONTEND</h2>
+<p class="has-line-data" data-line-start="785" data-line-end="786">None required in Phase 1 unless documenting copy. Do not add <code>/dashboard/company-profile</code> or org switcher. Phase 4 ships register-company page.</p>
+<h2 class="code-line has-line-data" data-line-start="787" data-line-end="788"><a id="WORKFLOWS_787"></a>WORKFLOWS</h2>
+<p class="has-line-data" data-line-start="789" data-line-end="790">Bootstrap default org; helper creates non-default org + platform_admin; login primary membership; activity write includes org when actor has org.</p>
+<h2 class="code-line has-line-data" data-line-start="791" data-line-end="792"><a id="INTEGRATIONS_791"></a>INTEGRATIONS</h2>
+<p class="has-line-data" data-line-start="793" data-line-end="794">Storefront <code>DEFAULT_ORG_ID</code>; JWT <code>orgId</code>; registration does not change public catalog org.</p>
+<h2 class="code-line has-line-data" data-line-start="795" data-line-end="796"><a id="SECURITY_795"></a>SECURITY</h2>
+<p class="has-line-data" data-line-start="797" data-line-end="798">Never trust client orgId. Suspended org must not serve staff as if active. New orgs must not become <code>isDefault</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="799" data-line-end="800"><a id="ERROR_HANDLING_799"></a>ERROR HANDLING</h2>
+<p class="has-line-data" data-line-start="801" data-line-end="802">Missing membership org on staff routes → 403 <code>Organization membership required</code>. Missing default org → bootstrap error. Duplicate slug → 400.</p>
+<h2 class="code-line has-line-data" data-line-start="803" data-line-end="804"><a id="EDGE_CASES_803"></a>EDGE CASES</h2>
+<ul>
+<li class="has-line-data" data-line-start="805" data-line-end="806">Client, no membership, orgId null</li>
+<li class="has-line-data" data-line-start="806" data-line-end="807">Staff with two memberships (JWT primary only — no switcher)</li>
+<li class="has-line-data" data-line-start="807" data-line-end="808">Tailor membership on storefront org</li>
+<li class="has-line-data" data-line-start="808" data-line-end="809">Registered company admin’s JWT orgId ≠ storefront org</li>
+<li class="has-line-data" data-line-start="809" data-line-end="811"><code>isDefault</code> org vs <code>DEFAULT_ORG_ID</code> env mismatch (already warned in <code>org.ts</code>)</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="811" data-line-end="812"><a id="TESTING_811"></a>TESTING</h2>
+<ul>
+<li class="has-line-data" data-line-start="813" data-line-end="814"><code>ensure-default-org</code> still idempotent</li>
+<li class="has-line-data" data-line-start="814" data-line-end="815">Helper creates second org with <code>isDefault: false</code> + <code>platform_admin</code></li>
+<li class="has-line-data" data-line-start="815" data-line-end="816">Login still issues orgId for members</li>
+<li class="has-line-data" data-line-start="816" data-line-end="817">New ActivityLog from a staff denial includes org context</li>
+<li class="has-line-data" data-line-start="817" data-line-end="819">Customer signup still creates no Membership / no Organization</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="819" data-line-end="820"><a id="DEPENDENCIES_819"></a>DEPENDENCIES</h2>
+<p class="has-line-data" data-line-start="821" data-line-end="822">None.</p>
+<h2 class="code-line has-line-data" data-line-start="823" data-line-end="824"><a id="COMPLETION_CRITERIA_823"></a>COMPLETION CRITERIA</h2>
+<ul>
+<li class="has-line-data" data-line-start="825" data-line-end="826"><input type="checkbox" id="checkbox0"><label for="checkbox0">Account→Organization map is in README and matches code names</label></li>
+<li class="has-line-data" data-line-start="826" data-line-end="827"><input type="checkbox" id="checkbox1"><label for="checkbox1">ActivityLog org context is consistent for new writes</label></li>
+<li class="has-line-data" data-line-start="827" data-line-end="828"><input type="checkbox" id="checkbox2"><label for="checkbox2">Primary membership policy is documented and matches </label><code>resolvePrimaryMembership</code></li>
+<li class="has-line-data" data-line-start="828" data-line-end="829"><input type="checkbox" id="checkbox_reg1"><label for="checkbox_reg1">Company registration contract + createOrg+platform_admin helper exist and are tested</label></li>
+<li class="has-line-data" data-line-start="829" data-line-end="830"><input type="checkbox" id="checkbox3"><label for="checkbox3">No ERP Company Profile / invoices / HR / org switcher added</label></li>
+<li class="has-line-data" data-line-start="830" data-line-end="831"><input type="checkbox" id="checkbox4"><label for="checkbox4">Clients still shop and signup without Membership</label></li>
+<li class="has-line-data" data-line-start="831" data-line-end="833"><input type="checkbox" id="checkbox5"><label for="checkbox5">Customer vs tailor rule still holds</label></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="829" data-line-end="830"><a id="PART_8_Phase_2_detail_829"></a>PART 8 — Phase 2 detail</h1>
+<h2 class="code-line has-line-data" data-line-start="831" data-line-end="832"><a id="PHASE_NAME_831"></a>PHASE NAME</h2>
+<p class="has-line-data" data-line-start="833" data-line-end="834">Staff tenancy &amp; <code>companyWideView</code> isolation consistency</p>
+<h2 class="code-line has-line-data" data-line-start="835" data-line-end="836"><a id="PHASE_OBJECTIVE_835"></a>PHASE OBJECTIVE</h2>
+<p class="has-line-data" data-line-start="837" data-line-end="838">Layer 1 (tenant) + Layer 2 (visibility) applied consistently on staff org-scoped resources, without breaking storefront or user-scoped commerce.</p>
+<h2 class="code-line has-line-data" data-line-start="839" data-line-end="840"><a id="FEATURES_INCLUDED_839"></a>FEATURES INCLUDED</h2>
+<ul>
+<li class="has-line-data" data-line-start="841" data-line-end="842">Inventory matrix of every staff list/detail/mutate route (complete §4.10)</li>
+<li class="has-line-data" data-line-start="842" data-line-end="843"><code>actor.orgId</code> on all org-scoped staff APIs</li>
+<li class="has-line-data" data-line-start="843" data-line-end="844"><code>withStaffDataScope</code> / <code>resolveStaffCatalogListFilter</code> / <code>actorHasCompanyWideView</code> used where ownership fields exist</li>
+<li class="has-line-data" data-line-start="844" data-line-end="845">Detail-by-id uses same tenant (+ own-scope) as list</li>
+<li class="has-line-data" data-line-start="845" data-line-end="846">Documented exceptions: org-wide settings; org-blind cart/wallet/customization staff lists</li>
+<li class="has-line-data" data-line-start="846" data-line-end="847">Cross-tenant 403</li>
+<li class="has-line-data" data-line-start="847" data-line-end="848"><code>platform_admin</code> always CWV true</li>
+<li class="has-line-data" data-line-start="848" data-line-end="850">Tailor studio APIs remain ownership-based, not staff CWV</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="850" data-line-end="851"><a id="TECHNICAL_IMPLEMENTATION_850"></a>TECHNICAL IMPLEMENTATION</h2>
+<p class="has-line-data" data-line-start="852" data-line-end="853">Audit and fix as needed:</p>
+<ul>
+<li class="has-line-data" data-line-start="854" data-line-end="855"><code>src/app/api/product/route.ts</code>, <code>[id]</code>, <code>bulk</code>, <code>seller</code>, <code>shop</code></li>
+<li class="has-line-data" data-line-start="855" data-line-end="856"><code>src/app/api/fabric/route.ts</code>, <code>[id]</code></li>
+<li class="has-line-data" data-line-start="856" data-line-end="857"><code>src/app/api/product-category/route.ts</code>, <code>[id]</code></li>
+<li class="has-line-data" data-line-start="857" data-line-end="858"><code>src/app/api/order/route.ts</code>, <code>[id]</code>, <code>me</code></li>
+<li class="has-line-data" data-line-start="858" data-line-end="859"><code>src/app/api/analytics/route.ts</code></li>
+<li class="has-line-data" data-line-start="859" data-line-end="860"><code>src/app/api/admin/members*</code></li>
+<li class="has-line-data" data-line-start="860" data-line-end="861"><code>src/app/api/admin/fashion-chats*</code></li>
+<li class="has-line-data" data-line-start="861" data-line-end="862"><code>src/app/api/admin/tailors*</code>, <code>tailoring-jobs*</code></li>
+<li class="has-line-data" data-line-start="862" data-line-end="863">Settings routes (confirm org-only exception)</li>
+<li class="has-line-data" data-line-start="863" data-line-end="865">Reviews moderate (product org B → 403)</li>
+</ul>
+<p class="has-line-data" data-line-start="865" data-line-end="866">Do not apply org filters to Cart/Wishlist/Wallet/Customization/Notification/MeasurementProfile customer rows.</p>
+<p class="has-line-data" data-line-start="867" data-line-end="868">Never take <code>orgId</code> from query/body except internally after server resolve.</p>
+<h2 class="code-line has-line-data" data-line-start="869" data-line-end="870"><a id="PROJECT_COMPONENTS_869"></a>PROJECT COMPONENTS</h2>
+<ul>
+<li class="has-line-data" data-line-start="871" data-line-end="872"><code>src/lib/staffOrg.ts</code> (reuse/extend; don’t fork)</li>
+<li class="has-line-data" data-line-start="872" data-line-end="873">Staff API routes listed above</li>
+<li class="has-line-data" data-line-start="873" data-line-end="874">Admin tables that show <code>createdByName</code> (ProductsTable) — keep in sync with filters</li>
+<li class="has-line-data" data-line-start="874" data-line-end="876"><code>src/lib/auth/resourcePolicy.ts</code> — still no financial mutation via orders:manage</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="876" data-line-end="877"><a id="DATA_876"></a>DATA</h2>
+<p class="has-line-data" data-line-start="878" data-line-end="879">Use existing <code>orgId</code>, <code>createdById</code>, <code>userId</code>, seller fields. Do not invent fake ownership.</p>
+<h2 class="code-line has-line-data" data-line-start="880" data-line-end="881"><a id="BACKEND_880"></a>BACKEND</h2>
+<p class="has-line-data" data-line-start="882" data-line-end="883">Staff lists that stamp/filter org must use <code>requirePermissionFresh</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="884" data-line-end="885"><a id="FRONTEND_884"></a>FRONTEND</h2>
+<p class="has-line-data" data-line-start="886" data-line-end="887">Admin list UIs already pass <code>?scope=staff</code> where required — verify products/fabrics/categories/orders still do. CWV=false user must not see coworkers’ catalog rows in those UIs.</p>
+<h2 class="code-line has-line-data" data-line-start="888" data-line-end="889"><a id="WORKFLOWS_888"></a>WORKFLOWS</h2>
+<p class="has-line-data" data-line-start="890" data-line-end="891">Staff list → open detail → edit/delete within org (+ own-scope).</p>
+<h2 class="code-line has-line-data" data-line-start="892" data-line-end="893"><a id="INTEGRATIONS_892"></a>INTEGRATIONS</h2>
+<p class="has-line-data" data-line-start="894" data-line-end="895">Public <code>GET /api/product</code> (no scope) remains storefront org.</p>
+<h2 class="code-line has-line-data" data-line-start="896" data-line-end="897"><a id="SECURITY_896"></a>SECURITY</h2>
+<p class="has-line-data" data-line-start="898" data-line-end="899">IDOR: guessed ids from org B. CWV cannot be set true via request body on reads (it’s a membership claim).</p>
+<h2 class="code-line has-line-data" data-line-start="900" data-line-end="901"><a id="ERROR_HANDLING_900"></a>ERROR HANDLING</h2>
+<p class="has-line-data" data-line-start="902" data-line-end="903">403 cross-tenant; 401 stale JWT on Fresh.</p>
+<h2 class="code-line has-line-data" data-line-start="904" data-line-end="905"><a id="EDGE_CASES_904"></a>EDGE CASES</h2>
+<ul>
+<li class="has-line-data" data-line-start="906" data-line-end="907">platform_admin CWV forced true even if DB false</li>
+<li class="has-line-data" data-line-start="907" data-line-end="908">Settings one-row-per-org</li>
+<li class="has-line-data" data-line-start="908" data-line-end="909">Staff who also owns a customer order: existing README says PUT/DELETE stays user-scoped for owner path — do not regress</li>
+<li class="has-line-data" data-line-start="909" data-line-end="911">Tailor <code>companyWideView: false</code> in <code>tailors.ts</code> invite path — do not treat as staff catalog CWV</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="911" data-line-end="912"><a id="TESTING_911"></a>TESTING</h2>
+<ul>
+<li class="has-line-data" data-line-start="913" data-line-end="914">Org A admin GET org B product <code>?scope=staff</code> → 403</li>
+<li class="has-line-data" data-line-start="914" data-line-end="915">CWV=false catalog_editor lists only own created products (if createdBy/seller set)</li>
+<li class="has-line-data" data-line-start="915" data-line-end="916">CWV=true sees all org A products</li>
+<li class="has-line-data" data-line-start="916" data-line-end="917">Public catalog unchanged</li>
+<li class="has-line-data" data-line-start="917" data-line-end="918">Client <code>GET /api/order/me</code> own only</li>
+<li class="has-line-data" data-line-start="918" data-line-end="920">Cart still user=sub</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="920" data-line-end="921"><a id="DEPENDENCIES_920"></a>DEPENDENCIES</h2>
+<p class="has-line-data" data-line-start="922" data-line-end="923">Phase 1 complete.</p>
+<h2 class="code-line has-line-data" data-line-start="924" data-line-end="925"><a id="COMPLETION_CRITERIA_924"></a>COMPLETION CRITERIA</h2>
+<ul>
+<li class="has-line-data" data-line-start="926" data-line-end="927"><input type="checkbox" id="checkbox6"><label for="checkbox6">Written matrix: org-only vs org+own vs org-blind</label></li>
+<li class="has-line-data" data-line-start="927" data-line-end="928"><input type="checkbox" id="checkbox7"><label for="checkbox7">Fabric/category/product/order/analytics/members comply</label></li>
+<li class="has-line-data" data-line-start="928" data-line-end="929"><input type="checkbox" id="checkbox8"><label for="checkbox8">Exceptions documented and intentional</label></li>
+<li class="has-line-data" data-line-start="929" data-line-end="930"><input type="checkbox" id="checkbox9"><label for="checkbox9">Storefront + cart/wishlist/wallet unchanged</label></li>
+<li class="has-line-data" data-line-start="930" data-line-end="932"><input type="checkbox" id="checkbox10"><label for="checkbox10">Tailor APIs not incorrectly rewritten as staff CWV</label></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="934" data-line-end="935"><a id="PART_9_Phase_3_detail_934"></a>PART 9 — Phase 3 detail</h1>
+<h2 class="code-line has-line-data" data-line-start="936" data-line-end="937"><a id="PHASE_NAME_936"></a>PHASE NAME</h2>
+<p class="has-line-data" data-line-start="938" data-line-end="939">Members admin, RoleTemplates &amp; permission catalog</p>
+<h2 class="code-line has-line-data" data-line-start="940" data-line-end="941"><a id="PHASE_OBJECTIVE_940"></a>PHASE OBJECTIVE</h2>
+<p class="has-line-data" data-line-start="942" data-line-end="943"><code>/admin/users</code> + members/templates APIs + <code>P.*</code> are one control plane with doc privilege boundaries.</p>
+<h2 class="code-line has-line-data" data-line-start="944" data-line-end="945"><a id="FEATURES_INCLUDED_944"></a>FEATURES INCLUDED</h2>
+<ul>
+<li class="has-line-data" data-line-start="946" data-line-end="947">Invite / create user / edit / revoke / hard delete</li>
+<li class="has-line-data" data-line-start="947" data-line-end="948">Grant ⊆ actor; template perms ⊆ actor; CWV grant ⊆ actor</li>
+<li class="has-line-data" data-line-start="948" data-line-end="949">Last <code>platform_admin</code> cannot be demoted/revoked/deleted</li>
+<li class="has-line-data" data-line-start="949" data-line-end="950"><code>set</code>-style role: single membership role per org (already one Membership row per user+org)</li>
+<li class="has-line-data" data-line-start="950" data-line-end="951">RoleTemplate unique name; delete blocked when assigned to active/invited/suspended</li>
+<li class="has-line-data" data-line-start="951" data-line-end="952">Overrides only add; <code>custom</code> for full override set</li>
+<li class="has-line-data" data-line-start="952" data-line-end="953"><code>authzVersion</code> bump + refresh kill on role/status change</li>
+<li class="has-line-data" data-line-start="953" data-line-end="954">Users UI chips = effective permissions (preset/template ∪ override)</li>
+<li class="has-line-data" data-line-start="954" data-line-end="955">Advanced checkboxes only actor-held permissions</li>
+<li class="has-line-data" data-line-start="955" data-line-end="956">Nav/API maps match catalog; README preset list fixed (<code>client</code> is JWT-only; <code>tailor</code> is Membership)</li>
+<li class="has-line-data" data-line-start="956" data-line-end="957">Tailor preset remains non-staff</li>
+<li class="has-line-data" data-line-start="957" data-line-end="959">Meta: there is no “manage permission catalog” tenant permission — catalog is code. Do not add a UI that lets tenants invent <code>P.*</code> strings outside <code>parsePermissionList</code></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="959" data-line-end="960"><a id="TECHNICAL_IMPLEMENTATION_959"></a>TECHNICAL IMPLEMENTATION</h2>
+<p class="has-line-data" data-line-start="961" data-line-end="962">Harden/verify:</p>
+<ul>
+<li class="has-line-data" data-line-start="963" data-line-end="964"><code>src/lib/memberAdmin.ts</code> — <code>assertAssignableGrants</code>, last admin, hard delete other-orgs message</li>
+<li class="has-line-data" data-line-start="964" data-line-end="965"><code>src/lib/roleTemplateAdmin.ts</code> — <code>assertTemplatePermissionsSubset</code></li>
+<li class="has-line-data" data-line-start="965" data-line-end="966"><code>src/app/api/admin/members/route.ts</code>, <code>[id]/route.ts</code></li>
+<li class="has-line-data" data-line-start="966" data-line-end="967"><code>src/app/api/admin/users/route.ts</code></li>
+<li class="has-line-data" data-line-start="967" data-line-end="968"><code>src/app/api/admin/role-templates/route.ts</code>, <code>[id]/route.ts</code></li>
+<li class="has-line-data" data-line-start="968" data-line-end="969"><code>src/lib/auth/permissions.ts</code> — presets, <code>ADMIN_ROUTE_PERMISSIONS</code>, <code>API_PERMISSIONS</code></li>
+<li class="has-line-data" data-line-start="969" data-line-end="970">Users UI components listed in §4.7</li>
+<li class="has-line-data" data-line-start="970" data-line-end="972"><code>src/lib/adminNav.ts</code> Users gated by <code>users:read</code></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="972" data-line-end="973"><a id="DATA_972"></a>DATA</h2>
+<p class="has-line-data" data-line-start="974" data-line-end="975">Membership + RoleTemplate; ActivityLog <code>entityType: Membership</code> / User on success.</p>
+<h2 class="code-line has-line-data" data-line-start="976" data-line-end="977"><a id="BACKEND_976"></a>BACKEND</h2>
+<p class="has-line-data" data-line-start="978" data-line-end="979">All members mutations Fresh + <code>logMembershipActivity</code> / <code>logActivityEntry</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="980" data-line-end="981"><a id="FRONTEND_980"></a>FRONTEND</h2>
+<p class="has-line-data" data-line-start="982" data-line-end="983">View / Edit / Invite / Create / Role templates tab / Blacklist. <code>catalog_editor</code> deep-link <code>/admin/users</code> → <code>/403?denied=permission</code>.</p>
+<h2 class="code-line has-line-data" data-line-start="984" data-line-end="985"><a id="WORKFLOWS_984"></a>WORKFLOWS</h2>
+<p class="has-line-data" data-line-start="986" data-line-end="987">Invite → email → login → claims. Edit → re-login. Template assign on custom. Create user verified + membership.</p>
+<h2 class="code-line has-line-data" data-line-start="988" data-line-end="989"><a id="INTEGRATIONS_988"></a>INTEGRATIONS</h2>
+<p class="has-line-data" data-line-start="990" data-line-end="991"><code>GET /api/auth/me</code> memberships list; login/refresh claims; proxy staff detection via preset.</p>
+<h2 class="code-line has-line-data" data-line-start="992" data-line-end="993"><a id="SECURITY_992"></a>SECURITY</h2>
+<p class="has-line-data" data-line-start="994" data-line-end="995">Cannot assign foreign org membership. Cannot grant <code>users:manage_roles</code> if actor lacks it. platform_admin-only for full staff catalog / Admin preset if that rule already exists — keep it.</p>
+<h2 class="code-line has-line-data" data-line-start="996" data-line-end="997"><a id="ERROR_HANDLING_996"></a>ERROR HANDLING</h2>
+<p class="has-line-data" data-line-start="998" data-line-end="999">400 duplicate email on create; 403 over-grant; 403 last admin.</p>
+<h2 class="code-line has-line-data" data-line-start="1000" data-line-end="1001"><a id="EDGE_CASES_1000"></a>EDGE CASES</h2>
+<ul>
+<li class="has-line-data" data-line-start="1002" data-line-end="1003">Self-edit logout</li>
+<li class="has-line-data" data-line-start="1003" data-line-end="1004">Invited status</li>
+<li class="has-line-data" data-line-start="1004" data-line-end="1005">Tailor invite auto-activate if currently implemented — do not break</li>
+<li class="has-line-data" data-line-start="1005" data-line-end="1006">Template ∪ override uniquePermissions</li>
+<li class="has-line-data" data-line-start="1006" data-line-end="1008">Unknown override strings dropped by <code>parsePermissionList</code></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1008" data-line-end="1009"><a id="TESTING_1008"></a>TESTING</h2>
+<ul>
+<li class="has-line-data" data-line-start="1010" data-line-end="1011">Client GET members → 403</li>
+<li class="has-line-data" data-line-start="1011" data-line-end="1012">catalog_editor GET members → 403</li>
+<li class="has-line-data" data-line-start="1012" data-line-end="1013">Over-grant POST → 403</li>
+<li class="has-line-data" data-line-start="1013" data-line-end="1014">Last admin demote → 403</li>
+<li class="has-line-data" data-line-start="1014" data-line-end="1015">After PATCH, old access token Fresh → 401</li>
+<li class="has-line-data" data-line-start="1015" data-line-end="1016">Template delete while assigned → error</li>
+<li class="has-line-data" data-line-start="1016" data-line-end="1018">Sidebar Users hidden without <code>users:read</code></li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1018" data-line-end="1019"><a id="DEPENDENCIES_1018"></a>DEPENDENCIES</h2>
+<p class="has-line-data" data-line-start="1020" data-line-end="1021">Phases 1–2.</p>
+<h2 class="code-line has-line-data" data-line-start="1022" data-line-end="1023"><a id="COMPLETION_CRITERIA_1022"></a>COMPLETION CRITERIA</h2>
+<ul>
+<li class="has-line-data" data-line-start="1024" data-line-end="1025"><input type="checkbox" id="checkbox11"><label for="checkbox11">Members/templates privilege boundaries hold</label></li>
+<li class="has-line-data" data-line-start="1025" data-line-end="1026"><input type="checkbox" id="checkbox12"><label for="checkbox12">UI matches API effective perms</label></li>
+<li class="has-line-data" data-line-start="1026" data-line-end="1027"><input type="checkbox" id="checkbox13"><label for="checkbox13">README presets match schema</label></li>
+<li class="has-line-data" data-line-start="1027" data-line-end="1028"><input type="checkbox" id="checkbox14"><label for="checkbox14">Tailor is not staff</label></li>
+<li class="has-line-data" data-line-start="1028" data-line-end="1030"><input type="checkbox" id="checkbox15"><label for="checkbox15">Last admin protected on POST/PATCH/DELETE</label></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1032" data-line-end="1033"><a id="PART_10_Phase_4_detail_1032"></a>PART 10 — Phase 4 detail</h1>
+<h2 class="code-line has-line-data" data-line-start="1034" data-line-end="1035"><a id="PHASE_NAME_1034"></a>PHASE NAME</h2>
+<p class="has-line-data" data-line-start="1036" data-line-end="1037">Security audit surfaces, bootstrap sync, <strong>company registration/onboarding</strong> &amp; cross-feature RBAC</p>
+<h2 class="code-line has-line-data" data-line-start="1038" data-line-end="1039"><a id="PHASE_OBJECTIVE_1038"></a>PHASE OBJECTIVE</h2>
+<p class="has-line-data" data-line-start="1040" data-line-end="1041">Auth lifecycle, bootstrap scripts, <strong>self-serve multi-company registration</strong>, and staff/tailor/client gates behave as one system.</p>
+<h2 class="code-line has-line-data" data-line-start="1042" data-line-end="1043"><a id="FEATURES_INCLUDED_1042"></a>FEATURES INCLUDED</h2>
+<ul>
+<li class="has-line-data" data-line-start="1044" data-line-end="1045">Customer signup always client; Google always client — <strong>unchanged</strong></li>
+<li class="has-line-data" data-line-start="1045" data-line-end="1046"><strong>Ship company registration/onboarding</strong> (workflow §5.2b): dedicated page + API using Phase 1 helper — new <code>Organization</code> (<code>isDefault: false</code>) + first <code>platform_admin</code> Membership (CWV true) + JWT → <code>/admin</code></li>
+<li class="has-line-data" data-line-start="1046" data-line-end="1047">After onboarding, that company uses <code>/admin/users</code> to create RoleTemplates, assign <code>P.*</code> permissions, invite team, manage own records</li>
+<li class="has-line-data" data-line-start="1047" data-line-end="1048"><code>create-admin</code> / <code>ensure-default-org</code> / <code>ensure-memberships</code> match Phases 1–3 (storefront ops path remains)</li>
+<li class="has-line-data" data-line-start="1048" data-line-end="1049">Suspended/revoked/invited membership does not elevate via <code>User.role=admin</code></li>
+<li class="has-line-data" data-line-start="1049" data-line-end="1050">Stale JWT: <code>authzVersion</code> / JTI; message “Session outdated; sign in again”</li>
+<li class="has-line-data" data-line-start="1050" data-line-end="1051">Activity/permission-denial audits include org context from Phase 1</li>
+<li class="has-line-data" data-line-start="1051" data-line-end="1052">Session model: document authzVersion invalidation; optional terminate UI <strong>only</strong> if it fits Users page without a new ERP security hub</li>
+<li class="has-line-data" data-line-start="1052" data-line-end="1053"><code>DELETE /api/auth/me</code> still refuses sole platform_admin</li>
+<li class="has-line-data" data-line-start="1053" data-line-end="1054">Proxy: client <code>/admin</code> → <code>/403</code>; staff <code>/profile</code> → <code>/admin</code>; tailor default <code>/tailor/home</code>; newly registered company admin → <code>/admin</code></li>
+<li class="has-line-data" data-line-start="1054" data-line-end="1055">Payments/cart isolation unchanged; public storefront still <code>DEFAULT_ORG_ID</code></li>
+<li class="has-line-data" data-line-start="1055" data-line-end="1056">Fix README <code>MONGO_URI</code> if Prisma/Postgres is SSOT; document register-company vs customer signup</li>
+<li class="has-line-data" data-line-start="1056" data-line-end="1057">Blacklist still org-scoped</li>
+<li class="has-line-data" data-line-start="1057" data-line-end="1058">Seller archived → client</li>
+<li class="has-line-data" data-line-start="1058" data-line-end="1060"><strong>Still out:</strong> org switcher UI</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1060" data-line-end="1061"><a id="TECHNICAL_IMPLEMENTATION_1057"></a>TECHNICAL IMPLEMENTATION</h2>
+<p class="has-line-data" data-line-start="1062" data-line-end="1063">Inspect/fix/add:</p>
+<ul>
+<li class="has-line-data" data-line-start="1064" data-line-end="1065"><code>src/app/api/auth/signup/route.ts</code>, <code>login</code>, <code>refresh</code>, <code>me</code>, <code>logout</code>, <code>google*</code></li>
+<li class="has-line-data" data-line-start="1065" data-line-end="1066"><strong>New:</strong> register-company API (e.g. <code>/api/orgs/register</code> or <code>/api/auth/register-company</code>) + page (e.g. <code>/register-company</code>) wired to Phase 1 helper</li>
+<li class="has-line-data" data-line-start="1066" data-line-end="1067"><code>src/proxy.ts</code>, <code>src/lib/auth/routePolicy.ts</code>, <code>src/utils/authRedirect.ts</code></li>
+<li class="has-line-data" data-line-start="1067" data-line-end="1068"><code>scripts/create-admin.mjs</code>, <code>ensure-default-org.mjs</code>, <code>ensure-memberships.mjs</code>, <code>repair-admin-memberships.mjs</code></li>
+<li class="has-line-data" data-line-start="1068" data-line-end="1069"><code>src/lib/userBlacklist.ts</code></li>
+<li class="has-line-data" data-line-start="1069" data-line-end="1070">Denial audit helpers</li>
+<li class="has-line-data" data-line-start="1070" data-line-end="1072"><code>PAYMENT_POLICY</code> — do not flip Stripe/Paystack/wallet</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1072" data-line-end="1073"><a id="PROJECT_COMPONENTS_1068"></a>PROJECT COMPONENTS</h2>
+<p class="has-line-data" data-line-start="1074" data-line-end="1075">Auth APIs, <strong>register-company page + API</strong>, proxy, scripts, README, maybe Users copy explaining “sign in again after role change”.</p>
+<h2 class="code-line has-line-data" data-line-start="1076" data-line-end="1077"><a id="DATA_1072"></a>DATA</h2>
+<p class="has-line-data" data-line-start="1078" data-line-end="1079">New Organization + Membership rows; Membership status; User.role vs preset; authzVersion.</p>
+<h2 class="code-line has-line-data" data-line-start="1080" data-line-end="1081"><a id="FRONTEND_1076"></a>FRONTEND</h2>
+<p class="has-line-data" data-line-start="1082" data-line-end="1083">Register-company form (company name, slug, admin email/password — Harewa UI). Link from sign-in if useful. 403 pages remain role-aware. Do not send tailors to <code>/admin</code> as default. No org switcher.</p>
+<h2 class="code-line has-line-data" data-line-start="1084" data-line-end="1085"><a id="WORKFLOWS_1080"></a>WORKFLOWS</h2>
+<p class="has-line-data" data-line-start="1086" data-line-end="1087">Customer signup; <strong>company registration → /admin</strong>; create-admin bootstrap; invite; role change; logout; tailor landing; staff landing.</p>
+<h2 class="code-line has-line-data" data-line-start="1088" data-line-end="1089"><a id="INTEGRATIONS_1084"></a>INTEGRATIONS</h2>
+<p class="has-line-data" data-line-start="1090" data-line-end="1091">Google OAuth (customer only); blacklist; activity log; Phase 1 org helper.</p>
+<h2 class="code-line has-line-data" data-line-start="1092" data-line-end="1093"><a id="SECURITY_1088"></a>SECURITY</h2>
+<p class="has-line-data" data-line-start="1094" data-line-end="1095">ACCEPTED unauthenticated mutators stay: identity auth, <strong>company register</strong> (rate-limited), Stripe webhook, Stripe/Paystack confirm, guest fashion-chat. All other resource mutators require auth/permission. Never trust client orgId on register.</p>
+<h2 class="code-line has-line-data" data-line-start="1096" data-line-end="1097"><a id="ERROR_HANDLING_1092"></a>ERROR HANDLING</h2>
+<p class="has-line-data" data-line-start="1098" data-line-end="1099">Expired token 401; invalid 401; missing perm 403; duplicate company slug/email 400.</p>
+<h2 class="code-line has-line-data" data-line-start="1100" data-line-end="1101"><a id="EDGE_CASES_1096"></a>EDGE CASES</h2>
+<ul>
+<li class="has-line-data" data-line-start="1102" data-line-end="1103">Sole platform_admin cannot delete self via members hard-delete or <code>/api/auth/me</code></li>
+<li class="has-line-data" data-line-start="1103" data-line-end="1104">Blacklisted signup / company register 403</li>
+<li class="has-line-data" data-line-start="1104" data-line-end="1105">Customer <code>/signup</code> must not create Organization</li>
+<li class="has-line-data" data-line-start="1105" data-line-end="1106">Registered company’s <code>isDefault</code> stays false; storefront catalog unchanged</li>
+<li class="has-line-data" data-line-start="1106" data-line-end="1108">Preset <code>client</code> on suspended staff while DB role still admin — <code>isStaffActor</code> honors preset first (already in routePolicy)</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1108" data-line-end="1109"><a id="TESTING_1102"></a>TESTING</h2>
+<ul>
+<li class="has-line-data" data-line-start="1110" data-line-end="1111">Signup body <code>role: admin</code> → DB client; no org created</li>
+<li class="has-line-data" data-line-start="1111" data-line-end="1112">Company register → new org + platform_admin + JWT orgId + can open <code>/admin</code></li>
+<li class="has-line-data" data-line-start="1112" data-line-end="1113">Second company register → isolated from first (cross-tenant 403)</li>
+<li class="has-line-data" data-line-start="1113" data-line-end="1114">Role change → refresh fails; Fresh 401</li>
+<li class="has-line-data" data-line-start="1114" data-line-end="1115">Client <code>/admin</code> → 403</li>
+<li class="has-line-data" data-line-start="1115" data-line-end="1116">Tailor sign-in → <code>/tailor/home</code></li>
+<li class="has-line-data" data-line-start="1116" data-line-end="1117">catalog_editor <code>/admin/tax-settings</code> → permission 403</li>
+<li class="has-line-data" data-line-start="1117" data-line-end="1119">Checkout still Stripe; cart user=sub</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1119" data-line-end="1120"><a id="DEPENDENCIES_1111"></a>DEPENDENCIES</h2>
+<p class="has-line-data" data-line-start="1121" data-line-end="1122">Phases 1–3 (Phase 1 helper required).</p>
+<h2 class="code-line has-line-data" data-line-start="1123" data-line-end="1124"><a id="COMPLETION_CRITERIA_1115"></a>COMPLETION CRITERIA</h2>
+<ul>
+<li class="has-line-data" data-line-start="1125" data-line-end="1126"><input type="checkbox" id="checkbox16"><label for="checkbox16">Bootstrap path works and is documented for Postgres/Prisma</label></li>
+<li class="has-line-data" data-line-start="1126" data-line-end="1127"><input type="checkbox" id="checkbox_reg4"><label for="checkbox_reg4">Company registration/onboarding page + API work end-to-end</label></li>
+<li class="has-line-data" data-line-start="1127" data-line-end="1128"><input type="checkbox" id="checkbox_reg4b"><label for="checkbox_reg4b">Two registered companies cannot see each other’s staff data</label></li>
+<li class="has-line-data" data-line-start="1128" data-line-end="1129"><input type="checkbox" id="checkbox17"><label for="checkbox17">No elevation via revoked membership</label></li>
+<li class="has-line-data" data-line-start="1129" data-line-end="1130"><input type="checkbox" id="checkbox18"><label for="checkbox18">Gates correct for staff/tailor/client</label></li>
+<li class="has-line-data" data-line-start="1130" data-line-end="1131"><input type="checkbox" id="checkbox19"><label for="checkbox19">Payments/cart unchanged; storefront still default org</label></li>
+<li class="has-line-data" data-line-start="1131" data-line-end="1132"><input type="checkbox" id="checkbox20"><label for="checkbox20">Docs env names accurate; register-company documented</label></li>
+<li class="has-line-data" data-line-start="1132" data-line-end="1134"><input type="checkbox" id="checkbox_noswitch"><label for="checkbox_noswitch">No org switcher shipped</label></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1125" data-line-end="1126"><a id="PART_11_Phase_5_detail_1125"></a>PART 11 — Phase 5 detail</h1>
+<h2 class="code-line has-line-data" data-line-start="1127" data-line-end="1128"><a id="PHASE_NAME_1127"></a>PHASE NAME</h2>
+<p class="has-line-data" data-line-start="1129" data-line-end="1130">Verification matrix, docs honesty &amp; production readiness</p>
+<h2 class="code-line has-line-data" data-line-start="1131" data-line-end="1132"><a id="PHASE_OBJECTIVE_1131"></a>PHASE OBJECTIVE</h2>
+<p class="has-line-data" data-line-start="1133" data-line-end="1134">Prove isolation/RBAC with automation; make README match code; fix residual gaps.</p>
+<h2 class="code-line has-line-data" data-line-start="1135" data-line-end="1136"><a id="FEATURES_INCLUDED_1135"></a>FEATURES INCLUDED</h2>
+<ul>
+<li class="has-line-data" data-line-start="1137" data-line-end="1144">Extend <code>scripts/verify-rbac-matrix.mjs</code> beyond A–I:
+<ul>
+<li class="has-line-data" data-line-start="1138" data-line-end="1139">CWV=false own-scope on a catalog or order list</li>
+<li class="has-line-data" data-line-start="1139" data-line-end="1140">Members over-grant 403</li>
+<li class="has-line-data" data-line-start="1140" data-line-end="1141">Last admin protect</li>
+<li class="has-line-data" data-line-start="1141" data-line-end="1142">Cross-tenant product+order (already G)</li>
+<li class="has-line-data" data-line-start="1142" data-line-end="1143">Signup role ignore (already I)</li>
+<li class="has-line-data" data-line-start="1143" data-line-end="1144">Stale authzVersion (already H)</li>
+<li class="has-line-data" data-line-start="1144" data-line-end="1145"><strong>Company registration:</strong> register two companies → each gets own org + platform_admin; cross-tenant staff product 403</li>
+</ul>
+</li>
+<li class="has-line-data" data-line-start="1145" data-line-end="1146"><code>ensure-second-org</code> checklist still valid (alongside self-serve registration)</li>
+<li class="has-line-data" data-line-start="1146" data-line-end="1147">README: presets, env (<code>DATABASE_URL</code> not stale Mongo-only), CWV coverage honesty, Account→Organization map, <strong>register-company vs customer signup</strong></li>
+<li class="has-line-data" data-line-start="1146" data-line-end="1147">Final independent audit of <strong>this feature only</strong></li>
+<li class="has-line-data" data-line-start="1147" data-line-end="1148">Performance sanity: Fresh membership on staff lists acceptable</li>
+<li class="has-line-data" data-line-start="1148" data-line-end="1150">No known critical IDOR</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1150" data-line-end="1151"><a id="TECHNICAL_IMPLEMENTATION_1150"></a>TECHNICAL IMPLEMENTATION</h2>
+<ul>
+<li class="has-line-data" data-line-start="1152" data-line-end="1153">Update verify script fixtures (<code>rbac-matrix-*@test.local</code>)</li>
+<li class="has-line-data" data-line-start="1153" data-line-end="1154">Fix any failing assertions</li>
+<li class="has-line-data" data-line-start="1154" data-line-end="1156">README sections: Security model, Organization, Membership, Tenant-scoped queries, Members APIs, Users UI, Admin gates, Verification matrix</li>
+</ul>
+<h2 class="code-line has-line-data" data-line-start="1156" data-line-end="1157"><a id="TESTING_1156"></a>TESTING</h2>
+<p class="has-line-data" data-line-start="1158" data-line-end="1159"><code>yarn verify-rbac</code> with dev server. Prerequisites must match Prisma (not <code>MONGO_URI</code> unless still required by leftover script — fix script instead of lying in README).</p>
+<h2 class="code-line has-line-data" data-line-start="1160" data-line-end="1161"><a id="DEPENDENCIES_1160"></a>DEPENDENCIES</h2>
+<p class="has-line-data" data-line-start="1162" data-line-end="1163">Phases 1–4.</p>
+<h2 class="code-line has-line-data" data-line-start="1164" data-line-end="1165"><a id="COMPLETION_CRITERIA_1164"></a>COMPLETION CRITERIA</h2>
+<ul>
+<li class="has-line-data" data-line-start="1166" data-line-end="1167"><input type="checkbox" id="checkbox21"><label for="checkbox21">verify-rbac green or blockers explicitly listed and then fixed</label></li>
+<li class="has-line-data" data-line-start="1167" data-line-end="1168"><input type="checkbox" id="checkbox_reg5"><label for="checkbox_reg5">Two-company registration isolation covered in verify matrix</label></li>
+<li class="has-line-data" data-line-start="1168" data-line-end="1169"><input type="checkbox" id="checkbox22"><label for="checkbox22">README matches code (incl. multi-company onboarding)</label></li>
+<li class="has-line-data" data-line-start="1169" data-line-end="1170"><input type="checkbox" id="checkbox23"><label for="checkbox23">Customer vs tailor still separate</label></li>
+<li class="has-line-data" data-line-start="1170" data-line-end="1171"><input type="checkbox" id="checkbox24"><label for="checkbox24">No Part B ERP / org switcher added</label></li>
+<li class="has-line-data" data-line-start="1171" data-line-end="1173"><input type="checkbox" id="checkbox25"><label for="checkbox25">Production-ready for org-membership RBAC + multi-company registration</label></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1174" data-line-end="1175"><a id="PART_12_Copypaste_EXECUTION_PROMPTS_1174"></a>PART 12 — Copy-paste EXECUTION PROMPTS</h1>
+<p class="has-line-data" data-line-start="1176" data-line-end="1177">Use these verbatim in a new Cursor chat or as the user message after <code>@RBAC Complete Execution PLAN2.html</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1180" data-line-end="1181"><a id="EXECUTION_PROMPT_PHASE_1_1180"></a>EXECUTION PROMPT — PHASE 1</h3>
+<pre><code class="has-line-data language-text" data-line-start="1183" data-line-end="1215">START PHASE 1 — Org-membership RBAC: Tenant foundation &amp; Account→Organization contract
+
+You are implementing PHASE 1 ONLY of RBAC Complete Execution PLAN2.html (Parts 0–7).
+
+BEFORE CODING:
+1. Read this execution bible (Parts 0–7 and 4 inventory) and Multi-Tenant RBAC Full Architecture &amp; Implementation.html conceptually.
+2. MAP Account→Organization, TeamMember→Membership, full_company_visibility→companyWideView, Company Admin→platform_admin. Permission codes stay Harewa P.* (resource:action).
+3. Do NOT build ERP modules (invoices, HR, payroll, company bank accounts, SubUser dual login, org SWITCHER UI, storefront approval lockout).
+4. Multi-company REGISTRATION/ONBOARDING is IN SCOPE for this feature: Phase 1 delivers the contract + reusable createOrganizationWithPlatformAdmin helper; Phase 4 ships the public page/API.
+5. Obey .cursor/rules/customer-vs-tailor-sections.mdc.
+6. Inspect prisma/schema.prisma, src/lib/org.ts, membership.ts, staffOrg.ts, audit/activityLog.ts, README, proxy.ts, permissions.ts.
+7. There is no previous phase. Confirm baseline: Organization + Membership + RoleTemplate + P catalog already exist.
+
+IMPLEMENT PHASE 1 ONLY (see Part 7 of the execution bible):
+- Establish Account→Organization SSOT in README + precise code comments where it prevents future confusion.
+- Organization invariants that fit Harewa (status, default org, unique slug). Optional ownerUserId only if non-breaking and clearly useful; otherwise document platform_admin as Company Admin.
+- Document company registration contract (§5.2b): new org isDefault=false; first Membership=platform_admin + companyWideView=true; storefront catalog stays DEFAULT_ORG_ID; customer /signup never creates an Organization.
+- Implement reusable server helper createOrganizationWithPlatformAdmin (or equivalent) for Phase 4 + scripts — do not require a public UI yet in Phase 1.
+- Reliable ActivityLog org context (schema orgId and/or enforced metadata) on new writes.
+- Document and enforce primary Membership resolution for JWT (no switcher; newly registered admin’s primary = that new org).
+- Keep client signup without Membership; storefront DEFAULT_ORG_ID unchanged.
+- Preserve tailor vs customer vs staff surfaces.
+
+THEN:
+- Integrate with existing helpers (do not duplicate org resolution).
+- Test bootstrap + helper-created second org + login claims + activity org context as applicable.
+- Fix issues in Phase 1 scope.
+- Summarize files changed and completion checklist.
+STOP. Do not start Phase 2.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1218" data-line-end="1219"><a id="EXECUTION_PROMPT_PHASE_2_1218"></a>EXECUTION PROMPT — PHASE 2</h3>
+<pre><code class="has-line-data language-text" data-line-start="1221" data-line-end="1243">START PHASE 2 — Org-membership RBAC: Staff tenancy &amp; companyWideView isolation
+
+BEFORE CODING:
+1. VERIFY PHASE 1 completion criteria in RBAC Complete Execution PLAN2.html Part 7 (incl. company registration helper/contract). If anything is missing or broken: FIX, re-test, then continue.
+2. Read Part 8 and the isolation matrix in Part 4.10.
+3. Inspect src/lib/staffOrg.ts and every staff list/detail route: product, fabric, category, order, analytics, members, fashion-chats, admin tailors/jobs, tax/ai/shipping/homepage/ads.
+
+IMPLEMENT PHASE 2 ONLY:
+- Every staff-scoped org resource uses actor.orgId. Never body.orgId or ?orgId= from the client.
+- When companyWideView=false, apply own-row filters on ownership-capable models (createdById / seller / user as already used).
+- Detail-by-id must use the same tenant (+ own-scope) rules as lists (no IDOR).
+- platform_admin always company-wide.
+- Multi-company isolation: Company A staff must 403 on Company B resource ids (this is the isolation registered companies will rely on).
+- Document exceptions: org-wide settings; org-blind cart/wallet/customization staff lists (no orgId on those models).
+- Do not change cart/wishlist/wallet/profile user===sub.
+- Do not break public storefront catalog (storefrontOrgFilter / DEFAULT_ORG_ID).
+- Do not apply staff CWV semantics to tailor-owned /api/tailor/* roster APIs.
+- Do not merge customer and tailor UIs. Do not ship org switcher.
+
+THEN: test cross-tenant 403 and CWV=false narrowing; fix regressions; summarize the finished matrix. STOP. Do not start Phase 3.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1246" data-line-end="1247"><a id="EXECUTION_PROMPT_PHASE_3_1246"></a>EXECUTION PROMPT — PHASE 3</h3>
+<pre><code class="has-line-data language-text" data-line-start="1249" data-line-end="1267">START PHASE 3 — Org-membership RBAC: Members admin, RoleTemplates &amp; permission catalog
+
+BEFORE CODING:
+1. VERIFY PHASE 2 (staff org + CWV matrix). Fix gaps first.
+2. Read Part 9 of RBAC Complete Execution PLAN2.html.
+3. Inspect memberAdmin.ts, roleTemplateAdmin.ts, permissions.ts, /api/admin/members*, /api/admin/role-templates*, /api/admin/users, UsersPermissionsPage, CreateUserModal, RoleTemplatesPanel, adminNav.ts.
+
+IMPLEMENT PHASE 3 ONLY:
+- Harden invite/create/edit/revoke/hard-delete: grant ⊆ actor, CWV ⊆ actor, last platform_admin protection, authzVersion + refresh invalidation.
+- RoleTemplates org-scoped; unique name; cannot grant beyond actor; cannot delete while assigned.
+- Align P.* catalog, ROLE_PRESETS, nav gates, API_PERMISSIONS. Fix README: Membership presets do not include client; they do include tailor. JWT RolePresetId includes client.
+- Users UI effective permissions must match API. UI is not security.
+- Each company’s platform_admin can manage ONLY that company’s members/templates/permissions (actor.orgId) — this is how registered companies run their own team/roles after onboarding.
+- Keep tailor preset as provider (not staff admin). Do not invent a tenant UI for inventing new P.* codes.
+
+THEN: test over-grant 403, last-admin 403, catalog_editor Users denial, template assign; fix; summarize. STOP. Do not start Phase 4.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1270" data-line-end="1271"><a id="EXECUTION_PROMPT_PHASE_4_1270"></a>EXECUTION PROMPT — PHASE 4</h3>
+<pre><code class="has-line-data language-text" data-line-start="1273" data-line-end="1300">START PHASE 4 — Org-membership RBAC: Security surfaces, bootstrap, company registration/onboarding &amp; cross-feature RBAC
+
+BEFORE CODING:
+1. VERIFY PHASE 3. Fix gaps first.
+2. Read Part 10 and workflow §5.2b of RBAC Complete Execution PLAN2.html.
+3. Inspect auth signup/login/refresh/me/logout/google, proxy.ts, routePolicy.ts, create-admin/ensure-* scripts, userBlacklist.ts, activity denial audits, Phase 1 createOrganizationWithPlatformAdmin helper.
+
+IMPLEMENT PHASE 4 ONLY:
+- Ship multi-company registration/onboarding: dedicated page (e.g. /register-company) + API (e.g. /api/orgs/register or /api/auth/register-company) that uses the Phase 1 helper.
+  Creates: User (or link per Phase 1 decision) + Organization (isDefault=false, unique slug, status active) + Membership platform_admin (companyWideView=true) + JWT with that orgId → redirect /admin.
+- Do NOT overload customer /signup or Google OAuth with company creation. Customer signup remains client-only (ignore body.role).
+- After register, company can use existing /admin/users for RoleTemplates, permissions, team members (Phases 2–3 isolation/privilege rules apply).
+- Sync bootstrap scripts with Phases 1–3 invariants (Prisma/Postgres). Bootstrap remains valid for storefront/default org.
+- Suspended/revoked/invited must not elevate via User.role=admin fallback (preset-first — verify APIs match).
+- Session invalidation via authzVersion / refreshTokenJTI must be correct. Do not ship a half-built ERP session-terminate hub.
+- Denial audits include org context from Phase 1.
+- Re-verify staff vs tailor vs client redirects and 403s.
+- PAYMENT_POLICY and cart/wishlist/wallet isolation unchanged. Public storefront stays DEFAULT_ORG_ID.
+- Fix stale docs (MONGO_URI vs DATABASE_URL). Document register-company vs customer signup.
+- Do NOT ship an org switcher UI.
+
+THEN: test customer signup role ignore; company register → /admin; two companies cross-tenant 403; stale JWT; tailor/admin/client gates; fix; summarize. STOP. Do not start Phase 5.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1303" data-line-end="1304"><a id="EXECUTION_PROMPT_PHASE_5_1303"></a>EXECUTION PROMPT — PHASE 5</h3>
+<pre><code class="has-line-data language-text" data-line-start="1306" data-line-end="1324">START PHASE 5 — Org-membership RBAC: Verification matrix, docs &amp; production readiness
+
+BEFORE CODING:
+1. VERIFY PHASE 4 (incl. company registration/onboarding end-to-end). Carry forward and fix any remaining Phase 1–4 correctness gaps.
+2. Read Part 11 of RBAC Complete Execution PLAN2.html.
+3. Inspect scripts/verify-rbac-matrix.mjs, ensure-second-org.mjs, README, register-company routes.
+
+IMPLEMENT PHASE 5 ONLY:
+- Extend/fix verify-rbac for anonymous, client IDOR, presets, cross-tenant, members over-grant, CWV=false, signup role ignore, stale authzVersion, AND two registered companies isolation (register A + B → staff product cross-tenant 403).
+- Make README match code (presets, env, CWV coverage, Account→Organization map, multi-company registration/onboarding).
+- Fix failures; re-run until green.
+- Final independent audit of org-membership RBAC + multi-company onboarding only (not ERP Part B; not org switcher).
+- Confirm customer vs tailor separation; storefront still uses default org.
+
+THEN: production-readiness report. STOP.
+</code></pre>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1308" data-line-end="1309"><a id="PART_13_Copypaste_FOLLOWUP_AUDIT_PROMPTS_1308"></a>PART 13 — Copy-paste FOLLOW-UP AUDIT PROMPTS</h1>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1312" data-line-end="1313"><a id="AUDIT_PROMPT_PHASE_1_1312"></a>AUDIT PROMPT — PHASE 1</h3>
+<pre><code class="has-line-data language-text" data-line-start="1315" data-line-end="1335">FOLLOW-UP AUDIT — Phase 1 (Org-membership RBAC foundation)
+
+Read RBAC Complete Execution PLAN2.html Part 7 completion criteria.
+
+Deep-audit Phase 1 only:
+- Account→Organization mapping documented and consistent with schema names
+- Organization invariants implemented as decided (no silent ERP Company Profile)
+- Company registration contract documented (§5.2b); createOrganizationWithPlatformAdmin (or equivalent) helper exists and creates isDefault=false + platform_admin + CWV true
+- ActivityLog has reliable org context on new writes
+- Primary membership policy clear; no org switcher added
+- Clients still signup/shop without Membership; customer signup does not create Organization
+- No invoices/HR/SubUser dual-login
+- Customer vs tailor sections untouched
+
+Check every relevant file for partial, missing, incorrect, disconnected, duplicate, or conflicting implementation.
+
+If anything fails: FIX IT, re-test, re-check synchronization. Only then mark Phase 1 complete.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1335" data-line-end="1336"><a id="AUDIT_PROMPT_PHASE_2_1335"></a>AUDIT PROMPT — PHASE 2</h3>
+<pre><code class="has-line-data language-text" data-line-start="1338" data-line-end="1354">FOLLOW-UP AUDIT — Phase 2 (Staff tenancy &amp; companyWideView)
+
+Verify Phase 1 still holds, then audit Phase 2 against Part 8 and the isolation matrix in Part 4.10:
+
+- Every staff org-scoped path uses actor.orgId
+- CWV=false own-scope on ownership-capable resources
+- Detail-by-id matches list filters (no IDOR)
+- Cross-tenant 403
+- platform_admin always CWV
+- Storefront public catalog unchanged
+- cart/wishlist/wallet still user===sub
+- Org-wide settings exception is intentional and documented
+- Tailor /api/tailor/* not incorrectly forced through staff CWV
+
+Fix all gaps; re-test IDOR/CWV; then mark Phase 2 complete.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1357" data-line-end="1358"><a id="AUDIT_PROMPT_PHASE_3_1357"></a>AUDIT PROMPT — PHASE 3</h3>
+<pre><code class="has-line-data language-text" data-line-start="1360" data-line-end="1376">FOLLOW-UP AUDIT — Phase 3 (Members admin &amp; permission catalog)
+
+Verify Phase 2 still holds, then audit Part 9:
+
+- Invite/create/edit/revoke/hard-delete
+- Grant ⊆ actor and CWV ⊆ actor
+- Last platform_admin protection on all mutating paths
+- RoleTemplates org-scoped; subset; delete-while-assigned blocked
+- authzVersion invalidation
+- Users UI vs API effective permissions
+- Catalog/nav/API_PERMISSIONS consistency
+- README presets match schema (no client Membership preset; tailor exists)
+- Tailor remains non-staff
+
+Fix all issues; re-test; mark Phase 3 complete.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1379" data-line-end="1380"><a id="AUDIT_PROMPT_PHASE_4_1379"></a>AUDIT PROMPT — PHASE 4</h3>
+<pre><code class="has-line-data language-text" data-line-start="1382" data-line-end="1401">FOLLOW-UP AUDIT — Phase 4 (Security, bootstrap, company registration, cross-feature)
+
+Verify Phase 3 still holds, then audit Part 10 + §5.2b:
+
+- Signup/create-admin/ensure scripts
+- Company registration/onboarding page + API end-to-end (new org + platform_admin + JWT → /admin)
+- Two companies cannot see each other’s staff data
+- Customer /signup still does not create Organization
+- login/refresh/me
+- Stale JWT behavior
+- proxy/routePolicy staff|tailor|client
+- Activity org context on denials
+- No admin elevation via revoked/suspended membership
+- Payments/cart isolation unchanged; storefront still DEFAULT_ORG_ID
+- Docs/env accuracy (Prisma); register-company documented
+- No org switcher
+
+Fix all issues; re-test auth + registration workflows; mark Phase 4 complete.
+</code></pre>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="1400" data-line-end="1401"><a id="AUDIT_PROMPT_PHASE_5_1400"></a>AUDIT PROMPT — PHASE 5</h3>
+<pre><code class="has-line-data language-text" data-line-start="1403" data-line-end="1415">FOLLOW-UP AUDIT — Phase 5 (Final org-membership RBAC + multi-company onboarding)
+
+Independent system-wide audit of org-membership RBAC alignment AND multi-company registration/onboarding (NOT ERP Part B; NOT org switcher).
+
+Re-run yarn verify-rbac (incl. two-company isolation). Confirm README honesty. Scan for remaining IDOR, CWV holes, members escalation, cross-tenant leaks, customer/tailor bleed, duplicate RBAC systems, customer signup creating orgs.
+
+Fix everything critical; re-audit fixes.
+
+Declare production-ready only if Part 14 final criteria are met.
+</code></pre>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1416" data-line-end="1417"><a id="PART_14_Completion_criteria_1416"></a>PART 14 — Completion criteria</h1>
+<h2 class="code-line has-line-data" data-line-start="1418" data-line-end="1419"><a id="Per_phase_1418"></a>Per phase</h2>
+<p class="has-line-data" data-line-start="1420" data-line-end="1421">See checklists in Parts 7–11.</p>
+<h2 class="code-line has-line-data" data-line-start="1422" data-line-end="1423"><a id="Final_system_all_must_be_true_1422"></a>Final system (all must be true)</h2>
+<ol>
+<li class="has-line-data" data-line-start="1424" data-line-end="1425">Organization is the only tenant root; Account mapping is documented.</li>
+<li class="has-line-data" data-line-start="1425" data-line-end="1426">Multi-company registration/onboarding works: new companies get their own Organization + first <code>platform_admin</code>, then manage own dashboard, roles, permissions, team, and records.</li>
+<li class="has-line-data" data-line-start="1426" data-line-end="1427">Membership + RoleTemplate + <code>P.*</code> are the only staff RBAC control plane.</li>
+<li class="has-line-data" data-line-start="1427" data-line-end="1428">Staff data access = <code>actor.orgId</code> + documented <code>companyWideView</code> rules.</li>
+<li class="has-line-data" data-line-start="1428" data-line-end="1429">Members admin cannot over-grant or remove last <code>platform_admin</code>.</li>
+<li class="has-line-data" data-line-start="1429" data-line-end="1430">Clients remain Membership-optional; cart/wishlist/wallet stay <code>user===sub</code>; customer signup does not create an Organization.</li>
+<li class="has-line-data" data-line-start="1430" data-line-end="1431">Tailor studio stays under <code>/tailor/*</code>; customers under storefront + <code>/profile</code>.</li>
+<li class="has-line-data" data-line-start="1431" data-line-end="1432">Cross-tenant IDOR tests fail closed (including two registered companies).</li>
+<li class="has-line-data" data-line-start="1432" data-line-end="1433">Public storefront catalog still uses <code>DEFAULT_ORG_ID</code> / default org.</li>
+<li class="has-line-data" data-line-start="1433" data-line-end="1434">Bootstrap + verify scripts match Prisma/Postgres; no org switcher.</li>
+<li class="has-line-data" data-line-start="1434" data-line-end="1435">README matches code.</li>
+<li class="has-line-data" data-line-start="1435" data-line-end="1436">No Part B ERP modules were introduced.</li>
+<li class="has-line-data" data-line-start="1436" data-line-end="1437">All five phase audits passed with fixes applied.</li>
+<li class="has-line-data" data-line-start="1437" data-line-end="1439">No known critical RBAC/tenancy gap remains.</li>
+</ol>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1439" data-line-end="1440"><a id="PART_15_Connections_map_how_pieces_wire_1439"></a>PART 15 — Connections map (how pieces wire)</h1>
+<pre><code class="has-line-data" data-line-start="1442" data-line-end="1469">Browser page
+  → src/proxy.ts (edge JWT, routePolicy classify)
+  → React page (admin: can() + AdminLayout 403)
+  → fetch services (src/services/members.ts, products.ts, …)
+  → src/app/api/**/route.ts
+       → requireAuth / requirePermission / requirePermissionFresh
+       → refreshAuthzFromMembership (Fresh)
+       → staffOrg.requireActorOrgId / withStaffDataScope / org.storefrontOrgFilter
+       → Prisma
+       → ActivityLog (org context)
+       → JWT cookies (login/refresh)
+
+Membership change
+  → memberAdmin bumps User.authzVersion, clears refreshTokenJTI
+  → next Fresh staff call with old access token → 401
+  → user signs in again → new claims
+
+Storefront catalog
+  → org.getStorefrontOrgId()  (DEFAULT_ORG_ID or isDefault org)
+  → NOT jwt.orgId
+
+Staff catalog
+  → ?scope=staff
+  → requirePermissionFresh
+  → actor.orgId
+  → optional own-scope if !companyWideView
+</code></pre>
+<p class="has-line-data" data-line-start="1470" data-line-end="1471">Key imports to reuse (do not duplicate):</p>
+<ul>
+<li class="has-line-data" data-line-start="1472" data-line-end="1473"><code>@/lib/org</code></li>
+<li class="has-line-data" data-line-start="1473" data-line-end="1474"><code>@/lib/staffOrg</code></li>
+<li class="has-line-data" data-line-start="1474" data-line-end="1475"><code>@/lib/membership</code></li>
+<li class="has-line-data" data-line-start="1475" data-line-end="1476"><code>@/lib/memberAdmin</code></li>
+<li class="has-line-data" data-line-start="1476" data-line-end="1477"><code>@/lib/roleTemplateAdmin</code></li>
+<li class="has-line-data" data-line-start="1477" data-line-end="1478"><code>@/lib/auth/permissions</code></li>
+<li class="has-line-data" data-line-start="1478" data-line-end="1479"><code>@/lib/middleware/requireAuth</code></li>
+<li class="has-line-data" data-line-start="1479" data-line-end="1481"><code>@/lib/audit/activityLog</code></li>
+</ul>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1483" data-line-end="1484"><a id="PART_16_Execution_control_operator_1483"></a>PART 16 — Execution control (operator)</h1>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>You say</th>
+<th>Cursor does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(nothing yet)</em></td>
+<td>No coding. This file is the plan.</td>
+</tr>
+<tr>
+<td><code>START PHASE 1</code></td>
+<td>Phase 1 execution prompt only</td>
+</tr>
+<tr>
+<td>Paste Phase 1 audit prompt</td>
+<td>Audit + fix Phase 1</td>
+</tr>
+<tr>
+<td><code>START PHASE 2</code></td>
+<td>Verify Phase 1, then Phase 2</td>
+</tr>
+<tr>
+<td>…</td>
+<td>Repeat through Phase 5</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="1493" data-line-end="1494">Never automatically skip ahead.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1497" data-line-end="1498"><a id="PART_17_File_touch_list_expected_not_exclusive_1497"></a>PART 17 — File touch list (expected; not exclusive)</h1>
+<p class="has-line-data" data-line-start="1499" data-line-end="1500"><strong>Almost certainly</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1501" data-line-end="1502"><code>prisma/schema.prisma</code> (+ migration)</li>
+<li class="has-line-data" data-line-start="1502" data-line-end="1503"><code>README.md</code></li>
+<li class="has-line-data" data-line-start="1503" data-line-end="1504"><code>src/lib/org.ts</code></li>
+<li class="has-line-data" data-line-start="1504" data-line-end="1505"><code>src/lib/membership.ts</code></li>
+<li class="has-line-data" data-line-start="1505" data-line-end="1506"><code>src/lib/staffOrg.ts</code></li>
+<li class="has-line-data" data-line-start="1506" data-line-end="1507"><code>src/lib/memberAdmin.ts</code></li>
+<li class="has-line-data" data-line-start="1507" data-line-end="1508"><code>src/lib/roleTemplateAdmin.ts</code></li>
+<li class="has-line-data" data-line-start="1508" data-line-end="1509"><code>src/lib/auth/permissions.ts</code></li>
+<li class="has-line-data" data-line-start="1509" data-line-end="1510"><code>src/lib/audit/activityLog.ts</code></li>
+<li class="has-line-data" data-line-start="1510" data-line-end="1511"><code>src/app/api/admin/members/**</code></li>
+<li class="has-line-data" data-line-start="1511" data-line-end="1512"><code>src/app/api/admin/role-templates/**</code></li>
+<li class="has-line-data" data-line-start="1512" data-line-end="1513"><code>src/app/api/admin/users/route.ts</code></li>
+<li class="has-line-data" data-line-start="1513" data-line-end="1514">Staff catalog/order/analytics routes</li>
+<li class="has-line-data" data-line-start="1514" data-line-end="1515"><code>scripts/verify-rbac-matrix.mjs</code></li>
+<li class="has-line-data" data-line-start="1515" data-line-end="1516"><code>scripts/create-admin.mjs</code>, <code>ensure-default-org.mjs</code>, <code>ensure-memberships.mjs</code></li>
+<li class="has-line-data" data-line-start="1516" data-line-end="1518">Company registration helper + <code>/register-company</code> (or equivalent) page + register API (Phase 1 helper / Phase 4 ship)</li>
+</ul>
+<p class="has-line-data" data-line-start="1518" data-line-end="1519"><strong>Possibly</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1520" data-line-end="1521"><code>src/proxy.ts</code> / <code>routePolicy.ts</code> only if gate bugs found</li>
+<li class="has-line-data" data-line-start="1521" data-line-end="1522">Users UI components if API/UI drift</li>
+<li class="has-line-data" data-line-start="1522" data-line-end="1523">Fabric/category routes for CWV</li>
+<li class="has-line-data" data-line-start="1523" data-line-end="1524">ActivityLog Prisma client usage sites</li>
+<li class="has-line-data" data-line-start="1524" data-line-end="1526">Sign-in page link to register-company</li>
+</ul>
+<p class="has-line-data" data-line-start="1526" data-line-end="1527"><strong>Do not casually rewrite</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1528" data-line-end="1529">Payment providers, shipping providers, Cloudinary, fashion-chat guest start (beyond authz regressions)</li>
+<li class="has-line-data" data-line-start="1529" data-line-end="1530">Customer profile tabs / tailor studio feature set (RBAC only)</li>
+<li class="has-line-data" data-line-start="1530" data-line-end="1532">Do not add org switcher unless a future plan explicitly opens that scope</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="1531" data-line-end="1532"><em>End of execution bible. Feature name: <strong>Align &amp; harden org-membership RBAC</strong> (Account → Organization) including <strong>multi-company registration/onboarding</strong>.</em></p>
+
+</body>
+</html>

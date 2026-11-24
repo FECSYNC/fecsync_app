@@ -1,0 +1,219 @@
+import axios from "axios"
+import crypto from "crypto";
+import { transferRequest } from "./types/wallet";
+import { sendInvoiceMail } from "./sendInvoice";
+
+const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
+
+export const initializePayment = async (email: string, amount: number, metadata = {}) => {
+  const res = await axios.post("https://api.paystack.co/transaction/initialize", {
+    email,
+    amount: amount * 100, // Kobo
+    metadata,
+    callback_url: `${process.env.NEXT_PUBLIC_URL}/success`,
+  }, {
+
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET}`,
+      "Content-Type": "application/json",
+    },
+  })
+
+  return res.data.data
+}
+export type PaystackInitMetadata = {
+  items?: unknown[];
+  type: string;
+  amount: number;
+  uuid: string;
+  orderId: string;
+  /** Tenant org for invoice branding; omitted for platform wallet funding. */
+  orgId?: string | null;
+};
+
+export const initializePayment2 = async (
+  email: string,
+  amount: number,
+  metadata: PaystackInitMetadata = {
+    items: [],
+    type: "",
+    amount,
+    uuid: "",
+    orderId: "",
+  }
+) => {
+  const res = await fetch("https://api.paystack.co/transaction/initialize", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      amount: amount * 100, // convert to kobo
+      callback_url: process.env.PAYMENT_CALLBACK_URL,
+      metadata: {
+        type: metadata.type,
+        amount: metadata.amount,
+        uuid: metadata.uuid,
+        orderId: metadata.orderId,
+        items: JSON.stringify(metadata.items ?? []),
+      },
+    }),
+  });
+
+  const data = await res.json(); // <--- Parse the response body
+
+  if (!res.ok) {
+    // Optionally log error details
+    console.error("Paystack init error:", data);
+    throw new Error(data.message || "Failed to initialize Paystack payment");
+  }
+  // Send invoice in background — don't block payment redirect (especially for large carts).
+  void sendInvoiceMail({
+    to: email,
+    subject: "Payment Invoice",
+    data: {
+      customerName: email || "Customer",
+      invoiceId: data.data.reference,
+      items: (metadata.items ?? []) as {
+        product: { name: string; price: number };
+        quantity: number;
+      }[],
+      totalAmount: amount,
+      dueDate: new Date().toISOString().split("T")[0],
+      date: new Date().toISOString().split("T")[0],
+      paymentMethod: "Paystack",
+      payUrl: data.data.authorization_url,
+    },
+    orgId: metadata.orgId ?? null,
+  }).catch((err) => {
+    console.error("Paystack invoice email failed (non-blocking):", err);
+  });
+
+  return data.data;
+};
+
+export const initiatePaystackTransfer = async (
+  req: transferRequest
+) => {
+  const name = typeof req.name === "string" ? req.name.trim() : "";
+  const account_number =
+    typeof req.account_number === "string"
+      ? req.account_number.trim()
+      : String(req.account_number ?? "").trim();
+  const bank_code =
+    typeof req.bank_code === "string"
+      ? req.bank_code.trim()
+      : String(req.bank_code ?? "").trim();
+  const amount = Number(req.amount);
+  const reason =
+    (typeof req.reason === "string" && req.reason.trim()) ||
+    "Wallet withdrawal";
+  const transferReference =
+    (typeof req.reference === "string" && req.reference.trim()) ||
+    `wd-${crypto.randomUUID()}`;
+
+  if (!name || !account_number || !bank_code) {
+    throw new Error("Account name, number, and bank code are required");
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Invalid withdrawal amount");
+  }
+
+  const kobo = Math.round(amount * 100);
+  if (kobo < 1) {
+    throw new Error("Invalid withdrawal amount");
+  }
+
+  // Step 1: Create transfer recipient
+  const recipientRes = await fetch("https://api.paystack.co/transferrecipient", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "nuban",
+      name,
+      account_number,
+      bank_code,
+      currency: "NGN",
+    }),
+  });
+
+  const recipientData = await recipientRes.json();
+
+  if (!recipientRes.ok || !recipientData.data?.recipient_code) {
+    console.error("Paystack recipient error:", recipientData);
+    throw new Error(recipientData.message || "Failed to create transfer recipient");
+  }
+
+  const recipientCode = recipientData.data.recipient_code;
+
+  // Step 2: Initiate the transfer
+  const transferRes = await fetch("https://api.paystack.co/transfer", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source: "balance",
+      amount: kobo,
+      recipient: recipientCode,
+      reason,
+      reference: transferReference,
+    }),
+  });
+
+  const transferData = await transferRes.json();
+
+  if (!transferRes.ok) {
+    console.error("Paystack transfer error:", transferData);
+    throw new Error(transferData.message || "Failed to initiate transfer");
+  }
+
+  return transferData.data; // return useful info: reference, status, transfer_code
+};
+
+export const getPaystackBanks = async () => {
+  const res = await fetch("https://api.paystack.co/bank?currency=NGN&type=nuban", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("Failed to fetch Paystack banks:", data);
+    throw new Error(data.message || "Unable to fetch banks");
+  }
+  console.log("Paystack banks response:", data);
+  return data.data;
+};
+
+export const finalizePaystackTransfer = async (transfer_code: string, otp: string) => {
+  const res = await fetch("https://api.paystack.co/transfer/finalize_transfer", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      transfer_code,
+      otp
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("Failed to finalize transfer:", data);
+    throw new Error(data.message || "Transfer finalization failed");
+  }
+
+  return data.data;
+};

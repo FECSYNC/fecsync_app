@@ -1,0 +1,54 @@
+---
+description: Multi-tenant venue/event/attraction SaaS control-plane north star
+alwaysApply: true
+---
+
+# SaaS venue platform (control plane)
+
+Primary product = **multi-tenant venue / event / attraction operations SaaS** (VenueFlow-style), not an ecommerce-first product. The public Harewa shop is a **secondary** inherited surface.
+
+## Tenant model
+
+| Concept | Meaning |
+|---|---|
+| **Organization** | Paying / registered **company workspace** (tenant HQ). One subscription per org. |
+| **VenueLocation** | Park / venue / site under a company (multi-park). Plan limit resource: `venues`. |
+| **Membership** | Staff seat on an Organization (`platform_admin`, ops, catalog, finance, tailor, …). Optional `MembershipVenueAssignment` rows park-lock the seat. |
+| **MembershipVenueAssignment** | Active park assignment (`membershipId` + `locationId` + `orgId`). One+ rows → park-locked (Growth/Starter OK). Cleared on venue archive. |
+| **Franchise park** | `VenueLocation.isFranchise` (+ franchise profile fields) under the same Organization (Option A). Not a second tenant / SaaS Stripe Customer. Guest card money for franchise parks uses `VenueLocationMarketplaceAccount` + `resolveGuestPayoutDestination` (Step 3); SaaS billing stays company-wide. |
+| **franchiseParkManager** | Park-locked `Membership` flag: invite/manage staff only inside assigned parks. Never `platform_admin` / never company-wide. |
+| **DEFAULT_ORG / isDefault** | Public Harewa storefront catalog host — **never** locked by tenant expiry or suspend. |
+
+Future feature modules (Access Control, Guest Surveys, Loyalty, Dynamic Pricing, Reporting) are **org-scoped**, and **location-scoped when applicable** (`orgId` + optional `locationId`). Do not fake-implement those modules; leave schema/plan/docs hooks only. **Already shipped and must be extended, not re-stubbed:** Online Ticketing (Phases 1–5), guest Memberships (Phases 1–5), Digital Waivers **Phases 1–5** (templates, guest signing, kiosk, desk verify/void/import/export, expiry reminders, booking confirmation links, party waiver list on read, production smokes), Company category pages **Steps 1–4** (`PublicCategoryPage` per booking/membership/menu category, white-label `/{orgSlug}/{categorySlug}`, embedded booking checkout, `?embed=1` + `public/embed/category.js` framed only by the company's https embed origins + website), **POS terminal Steps 1–2** (catalog/sale engine + staff terminal/check-in/tills/tabs/capacity; Growth+ `assertModuleEnabled("pos")`; `posTerminals` plan meter), **Party Management Steps 1–2** (`src/lib/parties/**` engine over the booking engine: packages, rooms, deposits, guests, invitations/RSVP, food → POS KitchenTicket, balances, `/admin/parties*` screens, public party booking + `/party/invite/[token]`, Profile → My Parties; rides `assertModuleEnabled("ticketing")`; no Party Command Center / KDS / kiosk), **Accounting Steps 1–2** (ledger, auto-posting outbox, AR/AP, banking, inventory, reports, admin UI under `/admin/accounting/**`, module deep-links via `AccountingEntriesPanel`, Growth+ `assertModuleEnabled("accounting")` when entitled). The separate **check-in scanner product** and the **ticket-purchase kiosk** are not shipped.
+
+## Registration (company-only self-serve)
+
+1. **Public self-registration** is **only** `/register-company` (+ required package `demo` | `starter` | `growth` | `enterprise`). Creates User + `Organization` (`pending`) + `platform_admin` Membership → Stripe Checkout when available. **`demo`** uses free Checkout (`$0`, `payment_method_collection: if_required` — no card / no charge). Paid packages use Price IDs; Enterprise / unpaid without Price → `/company-pending`.
+2. **`/signup` and `POST /api/auth/signup`** are **closed** (redirect / 410). Do not recreate guest shop self-reg.
+3. **Google OAuth** may sign in **existing** users only — never create new `client` accounts. New operators use company registration.
+4. Landing “Sign up” / “Choose Starter/Growth/Demo” **must** go to `/register-company` (optionally `?plan=…`). Plan selects Checkout interest; entitlement comes from Checkout webhook/confirm (including free Demo) or ops stamp — never from the dropdown alone.
+5. Staff/client users may still be created by **ops** (`yarn create-admin`, invites, `POST /api/admin/users`) — not via public signup.
+
+## Surfaces (do not merge)
+
+- **Customer** — public storefront + `/profile` (see `customer-vs-tailor-sections.mdc`).
+- **Tailor** — `/tailor/*` only.
+- **Company SaaS admin** — `/admin/*` for each tenant (actor.orgId).
+- **Enterprise HQ** — entitled `subscriptionPlan === "enterprise"` unlocks `/admin/hq` data + location switcher (`enterpriseHqEnabled`); page may soft-upsell non-Enterprise (no rollup leak). APIs use `assertEnterpriseHqEnabled`. Location preference (`actorLocationScope` / `Membership.hqSelectedLocationId`) filters venue lists + HQ venue items + park-stamped modules. Members roster + plan meters stay company-wide. **Park-locked** seats (`MembershipVenueAssignment`) are scoped to assigned parks without Enterprise; park-context switcher uses `/api/admin/park-context`. Platform software owner / FECSYNC storefront ops resolve company-wide (bypass). Not a second tenant; storefront never gets company HQ tools. SSOT: `docs/enterprise-hq-controls.md`, `src/lib/parkAdminScope.ts`.
+
+## Plan SSOT
+
+- Package ids: `demo` | `starter` | `growth` | `enterprise` — do not rename paid ids.
+- Single source of truth: `src/lib/subscriptionPlans.ts`.
+- **Demo lock:** company dashboard + company profile (+ Billing for upgrade) only — see `src/lib/demoPlanLock.ts` / `assertNotDemoPlanLocked`. All other admin apps fail-closed.
+- **Demo trial:** `COMPANY_DEMO_DAYS` (default 30). When Demo `subscriptionEndsAt` passes without upgrade → **suspend** (records kept). Self-serve renew locked; FECSYNC **Approve** or emergency **Set plan** → Demo (or paid) reactivates so they can upgrade.
+- **Emergency Set plan:** storefront `platform_admin` on `/admin/registered-companies` may stamp `demo|starter|growth|enterprise` on any registered company (subscription entitlement fields only — never alters venues/catalog/orders/memberships/history).
+- **Unpaid paid-plan period end:** soft-hold immediately + `COMPANY_BILLING_GRACE_DAYS` (default 7) countdown; then demote to `demo` (active + locked apps). **Never delete** org / venues / catalog / orders / memberships / history. Renew to any non-Demo plan restores entitlements only.
+- Enforceable caps live in `PlanLimits` + `src/lib/planLimits.ts` (venues, members, roleTemplates, workspace catalog tools, tailor modules).
+- Stripe Price env keys remain `STRIPE_PRICE_*_MONTHLY`. Demo may omit Price and use inline `$0` `price_data` + `payment_method_collection: if_required` (trial via `COMPANY_DEMO_DAYS`). VenueLocation is **never** billed separately.
+
+## Sync contract (Steps 2–4)
+
+- **Step 2** — billing/approve/expire use these plan ids; clear/set subscription fields; no parallel plan catalogs.
+- **Step 3** — notices/cron use `Organization.subscriptionEndsAt`; never email `/signup` users as tenants.
+- **Step 4** — isolation/export includes `VenueLocation`; Postgres RLS deferred (`docs/postgres-rls.md`); future Ticketing/POS tables **must** include `orgId` and optional `locationId` per `docs/saas-module-extension.md`. Control plane complete — see README.

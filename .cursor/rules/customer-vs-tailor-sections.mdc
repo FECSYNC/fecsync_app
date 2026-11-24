@@ -1,0 +1,39 @@
+---
+description: Keep customer and tailor sections separate during TailorsMate-inspired upgrades
+alwaysApply: true
+---
+
+# Customer vs Tailor (team member)
+
+Harewa has two distinct product surfaces. Do not merge them, and do not copy TailorsMate’s mixed bottom nav (Home / Tailors / Discover / Chat) into either section.
+
+Use Harewa UI (gold `#D4AF37`, stone/gray, existing layouts). Borrow structure and workflows from reference screenshots, not branding.
+
+## Customers (`client` preset)
+
+Stay in public storefront + `/profile`:
+
+- Shop, cart, checkout, customize
+- Find a Tailor (`/tailors`) — discovery and booking only
+- Profile: orders, customizations, measurements, tailoring jobs (as customer), wishlist, info
+- Campaign **join** as a participant: `/join/[slug]` then submit measurements from `/profile?tab=measurements`
+
+Never put tailor studio tools (client roster, campaign CRUD, sponsored credits) on customer pages.
+
+## Tailors / team members (`tailor` Membership preset)
+
+Stay under `/tailor/*` only:
+
+- `/tailor/home` — studio dashboard + **their** client roster
+- `/tailor/jobs` — jobs/appointments for work assigned to them
+- `/tailor/campaigns` — measurement campaigns they own
+- `/tailor/notifications` — tailor alerts
+- `/tailor/dashboard` — studio profile / portfolio editor
+
+Default after sign-in: `/tailor/home`. Header “Store” may open `/home` so they can shop; that is the only intended cross-nav.
+
+## Do not
+
+- Link tailor nav to `/profile`, `/tailors`, or `/trending-fashion` as primary workspace items
+- Put customer orders/wishlist inside the tailor dashboard
+- Weaken RBAC so customers can manage tailor clients or campaigns

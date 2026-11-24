@@ -1,0 +1,88 @@
+/* Newsletter rich-text editor — mirrors the email renderer's typography. */
+.nl-editor .nl-content {
+  min-height: 7rem;
+  outline: none;
+  color: #374151;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  padding: 0.875rem 1rem;
+  overflow-wrap: anywhere;
+}
+.nl-editor .nl-content p {
+  margin: 0 0 0.75rem;
+}
+.nl-editor .nl-content > :last-child {
+  margin-bottom: 0;
+}
+.nl-editor .nl-content h2 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.3rem;
+  font-weight: 650;
+  color: #1f2937;
+}
+.nl-editor .nl-content h3 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: #1f2937;
+}
+.nl-editor .nl-content ul,
+.nl-editor .nl-content ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.5rem;
+}
+.nl-editor .nl-content ul {
+  list-style: disc;
+}
+.nl-editor .nl-content ol {
+  list-style: decimal;
+}
+.nl-editor .nl-content li {
+  margin: 0 0 0.25rem;
+}
+.nl-editor .nl-content li > p {
+  margin: 0;
+}
+.nl-editor .nl-content blockquote {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 4px solid #d4af37;
+  background: #fffbf0;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #4b5563;
+}
+.nl-editor .nl-content blockquote p {
+  margin: 0;
+}
+.nl-editor .nl-content hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+}
+.nl-editor .nl-content a {
+  color: #a6892a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nl-editor .nl-content .nl-merge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 9999px;
+  background: rgba(212, 175, 55, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.35);
+  color: #7a6318;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: baseline;
+  user-select: all;
+}
+.nl-editor .nl-content .nl-merge-chip::before {
+  content: "✦";
+  font-size: 0.7em;
+  opacity: 0.8;
+}

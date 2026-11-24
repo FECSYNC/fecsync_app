@@ -1,0 +1,86 @@
+import { NextRequest } from "next/server";
+import {
+  ok,
+  badRequest,
+  serverError,
+  authErrorToResponse,
+  authAudit,
+  errorResponse,
+} from "@/lib/response";
+import { requirePermissionFresh, requireAnyPermissionFresh } from "@/lib/middleware/requireAuth";
+import { P } from "@/lib/auth/permissions";
+import { requireActorOrgId } from "@/lib/staffOrg";
+import { isPlainObject } from "@/lib/catalogWrite";
+import { ForbiddenError } from "@/lib/auth/http-error";
+import {
+  syncMarketplaceAccountFromProvider,
+  toMarketplaceAccountDto,
+} from "@/lib/marketplace/account";
+import { getMarketplaceChargeReadyState } from "@/lib/marketplace/assertChargeReady";
+import { isPlanLimitOrBillingGateMessage } from "@/lib/planLimits";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/**
+ * POST /api/admin/marketplace/connect/sync
+ * Pull Connect account flags from Stripe into DB; return DTO + chargeReady.
+ */
+export async function POST(req: NextRequest) {
+  let actor;
+  try {
+    actor = await requirePermissionFresh(req, P.PayoutsManage);
+  } catch (err) {
+    return (
+      authErrorToResponse(
+        err,
+        authAudit(req, "POST /api/admin/marketplace/connect/sync", {
+          permission: P.PayoutsManage,
+        })
+      ) ?? serverError("Failed to authorize")
+    );
+  }
+
+  try {
+    const orgId = requireActorOrgId(actor);
+    const { assertNotParkLockedCompanyHq } = await import(
+      "@/lib/assertNotParkLockedCompanyHq"
+    );
+    await assertNotParkLockedCompanyHq(actor);
+
+    if (req.headers.get("content-length") && req.headers.get("content-length") !== "0") {
+      let body: unknown = null;
+      try {
+        body = await req.json();
+      } catch {
+        return badRequest("Invalid JSON");
+      }
+      if (isPlainObject(body) && ("orgId" in body || "organizationId" in body)) {
+        return badRequest("Unsupported marketplace fields in request body");
+      }
+    }
+
+    const row = await syncMarketplaceAccountFromProvider(orgId);
+    const ready = await getMarketplaceChargeReadyState(orgId);
+    const account = toMarketplaceAccountDto(row, orgId, ready.chargeReady);
+    return ok({ account, chargeReady: ready.chargeReady, chargeReadyReason: ready.reason });
+  } catch (err) {
+    if (err instanceof ForbiddenError) {
+      if (isPlanLimitOrBillingGateMessage(err.message)) {
+        return errorResponse(err.message, 403);
+      }
+      return authErrorToResponse(err) ?? badRequest(err.message);
+    }
+    const authRes = authErrorToResponse(
+      err,
+      authAudit(req, "POST /api/admin/marketplace/connect/sync", {
+        actorSub: actor.sub,
+        orgId: actor.orgId ?? null,
+        permission: P.PayoutsManage,
+      })
+    );
+    if (authRes) return authRes;
+    console.error("marketplace connect sync error:", err);
+    return serverError("Failed to sync Connect account");
+  }
+}

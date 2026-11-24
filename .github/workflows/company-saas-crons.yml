@@ -1,0 +1,40 @@
+# Optional: call secured cron routes with Bearer CRON_SECRET (same as Vercel Cron).
+name: company-saas-crons
+on:
+  schedule:
+    - cron: "0 * * * *"
+    - cron: "0 14 * * *"
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reconcile company subscriptions (hourly-ish)
+        if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS -X GET -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/reconcile-company-subscriptions"
+      - name: Remind + expire invites (daily)
+        if: github.event.schedule == '0 14 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS -X GET -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/remind-company-subscriptions"
+          curl -fsS -X GET -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/expire-membership-invites"
+          curl -fsS -X GET -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/marketing-automations"
+      - name: Deliver newsletter campaigns (every 15 min)
+        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS -X GET -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/marketing-campaigns"

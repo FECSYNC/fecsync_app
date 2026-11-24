@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#0B1F2A"/>
+  <!-- F mark for FECSYNC -->
+  <path d="M9 8h14v3.2H12.4V14h8.8v3.2H12.4V24H9V8z" fill="#1DB8A0"/>
+  <circle cx="23.5" cy="22.5" r="3.5" fill="#F4B942"/>
+</svg>

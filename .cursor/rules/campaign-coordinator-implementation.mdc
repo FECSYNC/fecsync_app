@@ -1,0 +1,762 @@
+---
+description: Full implementation spec for tailor→coordinator→group member measurement campaign hierarchy. Follow this exactly when building coordinator/group invite features — no partial implementations.
+globs: prisma/schema.prisma,src/lib/measurementCampaigns*.ts,src/app/api/campaigns/**,src/app/api/tailor/campaigns/**,src/components/**/campaigns/**,src/components/Protected/tailor/Campaign*.tsx,src/hooks/useMeasurementCampaigns.ts,src/services/measurementCampaigns.ts
+alwaysApply: false
+---
+
+# Campaign Coordinator & Group Invite — Implementation Spec
+
+## Mission
+
+Enable this end-to-end flow without breaking existing campaign features:
+
+1. **Tailor** creates a measurement campaign and invites a customer as **coordinator** (group leader).
+2. **Coordinator** signs up/signs in, joins, submits own measurements.
+3. **Coordinator** shares a **group link** and/or **individual invite links** with friends/family.
+4. **Group members** sign up, join under that coordinator, submit measurements.
+5. **Tailor** sees a **hierarchical participant tree** in `/tailor/campaigns` (coordinator → members).
+6. All existing flows continue to work: open tailor link, tailor email invites, measurement submit, AI scans, CSV export, reminders, credits.
+
+## Non-negotiable constraints
+
+- **Customer UI** stays in `/profile` and `/join/[slug]` only. Never add tailor studio tools to customer pages.
+- **Tailor UI** stays under `/tailor/*` only.
+- **RBAC**: Customers never manage campaigns or tailor clients. Coordinator APIs only allow acting on **their own** participant row and **their own invitees**.
+- **Do not remove or weaken** existing join/submit validation (verified email, invite email match, campaign open window, credit checks).
+- **Complete each phase fully** before moving to the next. Every file listed in a phase must be updated. Run `npx prisma migrate dev` after schema changes.
+
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **direct** | Participant joined via tailor open link or tailor direct invite (not under a coordinator) |
+| **coordinator** | Customer designated by tailor; can invite members |
+| **member** | Customer who joined via coordinator group or individual link |
+| **shareToken** | Coordinator's reusable group link token (`?group=`) |
+| **inviteToken** | One-person token (`?invite=`) — existing field, also used for coordinator individual invites |
+
+## Architecture
+
+```
+MeasurementCampaign
+  └── CampaignParticipant (role: direct | coordinator | member)
+        ├── shareToken?          (coordinators only)
+        ├── canInviteMembers     (coordinators only)
+        ├── invitedByParticipantId? → parent CampaignParticipant
+        ├── coordinatorGroupLabel?  (optional label, e.g. "Bridesmaids")
+        └── invitees[]           (self-relation)
+```
+
+---
+
+## PHASE 0 — Schema & shared types (BLOCKING)
+
+### 0.1 Prisma schema (`prisma/schema.prisma`)
+
+Add enum and extend `CampaignParticipant`:
+
+```prisma
+enum CampaignParticipantRole {
+  direct
+  coordinator
+  member
+}
+
+model CampaignParticipant {
+  // ... keep all existing fields ...
+  role                   CampaignParticipantRole @default(direct)
+  canInviteMembers       Boolean                 @default(false)
+  shareToken             String?                 @unique
+  invitedByParticipantId String?
+  coordinatorGroupLabel  String?
+
+  invitedBy CampaignParticipant?  @relation("ParticipantTree", fields: [invitedByParticipantId], references: [id], onDelete: SetNull)
+  invitees  CampaignParticipant[] @relation("ParticipantTree")
+
+  @@index([campaignId, role])
+  @@index([invitedByParticipantId])
+  @@index([shareToken])
+}
+```
+
+Optional Phase 7 fields on `TailorClient`:
+
+```prisma
+  userId                  String?
+  campaignParticipantId   String? @unique
+```
+
+Run migration: `npx prisma migrate dev --name campaign_coordinator_hierarchy`
+
+### 0.2 Backfill (in migration SQL or seed script)
+
+```sql
+UPDATE campaign_participants SET role = 'direct', "canInviteMembers" = false WHERE role IS NULL;
+```
+
+Prisma `@default(direct)` handles new rows; existing rows get default on migration.
+
+### 0.3 Shared types (`src/lib/measurementCampaigns.shared.ts`)
+
+Add:
+
+```typescript
+export const CAMPAIGN_PARTICIPANT_ROLES = ["direct", "coordinator", "member"] as const;
+export type CampaignParticipantRole = (typeof CAMPAIGN_PARTICIPANT_ROLES)[number];
+```
+
+Extend `CampaignParticipantDto`:
+
+```typescript
+  role: CampaignParticipantRole;
+  canInviteMembers: boolean;
+  shareToken?: string;
+  invitedByParticipantId?: string;
+  invitedByName?: string;
+  coordinatorGroupLabel?: string;
+  inviteeCount?: number;
+  inviteeCompletedCount?: number;
+```
+
+Extend `PublicCampaignDto`:
+
+```typescript
+  groupCoordinatorName?: string;
+  groupCoordinatorLabel?: string;
+  joiningViaGroup?: boolean;
+  participantRole?: CampaignParticipantRole;
+  canInviteMembers?: boolean;
+  participantId?: string; // ensure present when authed
+```
+
+Extend `CustomerCampaignParticipationDto`:
+
+```typescript
+  role: CampaignParticipantRole;
+  canInviteMembers: boolean;
+  shareToken?: string;
+  coordinatorGroupLabel?: string;
+  inviteeStats?: { total: number; completed: number; accepted: number; invited: number };
+  groupJoinPath?: string; // /join/{slug}?group={shareToken}
+```
+
+Extend `inviteParticipantsSchema`:
+
+```typescript
+export const inviteParticipantsSchema = z.object({
+  expiresAt: z.string().trim().optional(),
+  defaultRole: z.enum(CAMPAIGN_PARTICIPANT_ROLES).default("direct"),
+  participants: z.array(
+    z.object({
+      fullName: z.string().trim().min(1).max(120),
+      email: z.string().trim().email().max(200),
+      role: z.enum(CAMPAIGN_PARTICIPANT_ROLES).optional(),
+    })
+  ).min(1).max(50),
+});
+```
+
+Add coordinator invite schemas:
+
+```typescript
+export const coordinatorInviteMemberSchema = z.object({
+  fullName: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().max(200).optional(),
+  coordinatorGroupLabel: z.string().trim().max(120).optional(),
+});
+
+export const coordinatorInviteBatchSchema = z.object({
+  coordinatorGroupLabel: z.string().trim().max(120).optional(),
+  members: z.array(coordinatorInviteMemberSchema).min(1).max(25),
+});
+
+export type CoordinatorInviteeDto = {
+  _id: string;
+  fullName: string;
+  email?: string;
+  status: CampaignParticipantStatus;
+  invitedAt: string;
+  acceptedAt?: string;
+  submittedAt?: string;
+  joinPath?: string;
+};
+
+export type CampaignParticipantTreeNode = CampaignParticipantDto & {
+  invitees: CampaignParticipantDto[];
+};
+```
+
+### 0.4 Verification
+
+- [ ] `npx prisma generate` succeeds
+- [ ] No TypeScript errors in shared types file
+- [ ] Existing tests/build pass before Phase 1
+
+---
+
+## PHASE 1 — Core backend: join & public campaign (CRITICAL)
+
+All logic lives primarily in `src/lib/measurementCampaigns.ts`. Update helpers consistently.
+
+### 1.1 Update selects and DTO mappers
+
+**File:** `src/lib/measurementCampaigns.ts`
+
+1. Extend `participantSummarySelect` and `participantDetailSelect` with:
+   `role`, `canInviteMembers`, `shareToken`, `invitedByParticipantId`, `coordinatorGroupLabel`
+
+2. Update `toParticipantDto()` to map all new fields.
+
+3. Add helper `generateShareToken(): string` — same as `inviteToken()` (24-byte hex).
+
+4. Add helper `buildGroupJoinPath(slug: string, shareToken: string): string` → `/join/${slug}?group=${shareToken}`
+
+5. Add helper `buildInviteJoinPath(slug: string, token: string): string` → `/join/${slug}?invite=${token}`
+
+6. Add `async function loadInvitedByName(invitedByParticipantId?: string | null): Promise<string | undefined>`
+
+7. Add `async function assertCoordinatorCanInvite(participant: { role: string; canInviteMembers: boolean; status: string; campaignId: string })`:
+   - Must have `canInviteMembers === true` OR `role === 'coordinator'`
+   - Must be `accepted` or `completed`
+   - Campaign must be open for participation
+
+### 1.2 Extend `getPublicCampaignBySlug`
+
+**Signature change:**
+
+```typescript
+getPublicCampaignBySlug(slug, opts?: {
+  userId?: string;
+  userEmail?: string;
+  inviteToken?: string;
+  groupToken?: string; // NEW
+})
+```
+
+**GET route** `src/app/api/campaigns/join/[slug]/route.ts`:
+- Read `group` query param alongside `invite`
+- Pass `groupToken` to `getPublicCampaignBySlug`
+
+**Logic when `groupToken` present (even for anonymous users):**
+1. Find participant where `shareToken === groupToken`, `canInviteMembers === true`, `role === coordinator`
+2. Verify campaign slug matches
+3. Return on `PublicCampaignDto`:
+   - `joiningViaGroup: true`
+   - `groupCoordinatorName: coordinator.fullName`
+   - `groupCoordinatorLabel: coordinator.coordinatorGroupLabel`
+4. If authed user already participant, include existing participant fields as today
+
+**Do NOT** require email match for group token preview (same as open link).
+
+### 1.3 Extend `joinCampaignBySlug`
+
+**Signature change:**
+
+```typescript
+joinCampaignBySlug(slug, userId, userName, userEmail, inviteTokenValue?, groupTokenValue?)
+```
+
+**POST route** must pass `body.groupToken` from client (also read from referer not required — explicit body only).
+
+**Join resolution order (inside transaction):**
+
+1. If user already has row for campaign (`campaignId + userId`) → update/accept as today
+2. Else if `inviteToken` → existing tailor/coordinator individual invite logic (email match when email set)
+3. Else if `groupToken` → NEW:
+   - Find coordinator row: `{ shareToken: groupToken, campaignId, role: 'coordinator', canInviteMembers: true }`
+   - If not found → throw `"Invalid or expired group link"`
+   - Create new participant:
+     ```typescript
+     {
+       campaignId, userId, fullName, email,
+       channel: "link",
+       role: "member",
+       invitedByParticipantId: coordinator.id,
+       coordinatorGroupLabel: coordinator.coordinatorGroupLabel,
+       status: "accepted",
+       aiScansAllocated: campaign.sponsoredScansPerInvitee,
+       acceptedAt: now,
+       inviteToken: inviteToken(), // keep unique constraint satisfied
+     }
+     ```
+   - Reserve AI credits same as open-link join
+4. Else → existing open-link join (role: `direct`)
+
+**Also update:** `ensureJoinedForCampaignSubmit` to accept and forward `groupToken`.
+
+**Notifications:** When member joins via coordinator, notify tailor:
+- Title: `New group member in {campaign.name}`
+- Body: `{name} joined via {coordinator.fullName}'s group link`
+- Metadata: `{ campaignId, participantId, coordinatorParticipantId }`
+
+### 1.4 Coordinator shareToken provisioning
+
+Add `async function ensureCoordinatorShareToken(participantId: string): Promise<string>`:
+- Load participant; must be coordinator with canInviteMembers
+- If `shareToken` missing, set one via update
+- Return shareToken
+
+Call `ensureCoordinatorShareToken`:
+- When tailor invites with role `coordinator` (on create)
+- When coordinator accepts invite (status → accepted) if shareToken missing
+- When coordinator requests their group link API (Phase 3)
+
+### 1.5 Extend `listMyCampaignParticipations`
+
+For each participation row where `canInviteMembers || role === 'coordinator'`:
+1. Count invitees: `where: { invitedByParticipantId: row.id }`
+2. Count completed invitees
+3. Ensure shareToken exists (call ensureCoordinatorShareToken)
+4. Populate DTO fields: `role`, `canInviteMembers`, `shareToken`, `coordinatorGroupLabel`, `inviteeStats`, `groupJoinPath`
+
+### 1.6 Client service sync
+
+**File:** `src/services/measurementCampaigns.ts`
+
+Update:
+- `getPublicCampaign(slug, opts?: { inviteToken?: string; groupToken?: string })`
+- `joinCampaign(slug, payload?: { ..., groupToken?: string })`
+
+**File:** `src/hooks/useMeasurementCampaigns.ts`
+
+- Extend `campaignKeys.public` to include `groupToken`
+- Extend `usePublicCampaignQuery(slug, authed, inviteToken?, groupToken?)`
+- Extend `useJoinCampaignMutation` to pass groupToken
+
+### 1.7 Join page UI sync
+
+**File:** `src/components/Public_C/campaigns/JoinCampaignClient.tsx`
+
+- Read `group` from searchParams alongside `invite`
+- Build `returnPath` preserving `?group=` or `?invite=`
+- Pass `groupToken` to queries and join mutation
+- Display banner when `campaign.joiningViaGroup`: "You're joining {groupCoordinatorName}'s group"
+- Sign-in link preserves group param
+
+**File:** `src/components/Public_C/campaigns/CampaignJoinHero.tsx`
+
+- Optional subtitle for group context
+
+### 1.8 Phase 1 verification
+
+- [ ] Open `/join/{slug}` still works (direct join)
+- [ ] `/join/{slug}?invite=` still works (tailor email invite)
+- [ ] `/join/{slug}?group={shareToken}` joins as member under coordinator (manual test after Phase 2 creates coordinator)
+- [ ] Submit measurements still works for all join paths
+- [ ] AI scan flow still receives slug/token correctly
+
+---
+
+## PHASE 2 — Tailor invites coordinators
+
+### 2.1 Extend `inviteCampaignParticipants`
+
+**File:** `src/lib/measurementCampaigns.ts`
+
+When creating/reinviting participants:
+- Read per-row `role` from payload (fallback to `defaultRole`, fallback `direct`)
+- If `role === 'coordinator'`:
+  ```typescript
+  canInviteMembers: true,
+  shareToken: inviteToken(), // or generateShareToken()
+  role: 'coordinator',
+  ```
+- If `role === 'member'` via tailor (unusual): `canInviteMembers: false`, no shareToken
+- If `role === 'direct'`: default behavior
+
+Email invite URL unchanged: `/join/{slug}?invite={inviteToken}`
+
+### 2.2 Tailor participants API
+
+**File:** `src/app/api/tailor/campaigns/[id]/participants/route.ts`
+
+No route change needed if body passes through — ensure `inviteCampaignParticipants` receives full body including roles.
+
+### 2.3 Tailor UI — invite form
+
+**File:** `src/components/Protected/tailor/CampaignParticipantsModal.tsx`
+
+1. Add state `defaultInviteRole: 'direct' | 'coordinator'`
+2. In invite panel, add role selector:
+   - "Participant (direct)" — default
+   - "Group coordinator (can invite their group)"
+3. Each invite row inherits role from default (or per-row dropdown if easy)
+4. Pass `defaultRole` and per-participant `role` in `useInviteParticipantsMutation` payload
+5. In participant table, add columns: **Role**, **Invited by**
+6. For coordinators, show badge "Coordinator" and invitee count if available
+
+### 2.4 Extend list participants for flat view
+
+**File:** `src/lib/measurementCampaigns.ts` — `listCampaignParticipants`
+
+- Include `invitedByName` by joining/lookup on `invitedByParticipantId`
+- Include `inviteeCount` and `inviteeCompletedCount` for coordinators
+
+### 2.5 Phase 2 verification
+
+- [ ] Tailor can invite email as coordinator
+- [ ] Coordinator receives email, joins, gets shareToken in API
+- [ ] Tailor participant list shows role=coordinator
+
+---
+
+## PHASE 3 — Coordinator member invite API (customer-side)
+
+### 3.1 New routes
+
+Create **`src/app/api/campaigns/my/[participantId]/invitees/route.ts`**
+
+```typescript
+// GET — list coordinator's invitees (RBAC: actor owns coordinator row)
+// Returns: { invitees: CoordinatorInviteeDto[], groupJoinPath: string, shareToken: string, stats: {...} }
+
+// POST — create individual member invites OR refresh group label
+// Body actions:
+//   { action: "invite", members: [{ fullName, email? }] , coordinatorGroupLabel? }
+//   { action: "set-group-label", coordinatorGroupLabel: string }
+// Returns: { invited: number, invitees: CoordinatorInviteeDto[] }
+```
+
+Create **`src/app/api/campaigns/my/[participantId]/group-link/route.ts`** (optional if GET invitees returns link)
+
+```typescript
+// GET — returns { groupJoinPath, shareToken } after ensureCoordinatorShareToken
+```
+
+### 3.2 Library functions (`src/lib/measurementCampaigns.ts`)
+
+```typescript
+export async function getCoordinatorContext(userId: string, participantId: string)
+export async function listCoordinatorInvitees(userId: string, participantId: string)
+export async function inviteMembersAsCoordinator(userId: string, participantId: string, raw: unknown)
+export async function setCoordinatorGroupLabel(userId: string, participantId: string, label: string)
+```
+
+**RBAC for all:**
+1. Resolve actor email via `resolveCampaignActorAccount(userId)`
+2. Load participant by id; `assertActorOwnsParticipant(participant, userId, email)`
+3. `assertCoordinatorCanInvite(participant)`
+4. Campaign must not be closed/archived/expired
+
+**Individual member invite (`inviteMembersAsCoordinator`):**
+- For each member with email:
+  - Create participant: `role: member`, `invitedByParticipantId`, `channel: email`, `status: invited`, `inviteToken`, copy `coordinatorGroupLabel`
+  - Do NOT set email on row if no email provided — use link-only flow instead
+  - Reserve AI credits per campaign rules (on join, not invite — match tailor behavior)
+- For email invites: send email via new mailer template `sendCoordinatorMemberInviteEmail` (copy structure of `sendCampaignInviteEmail`) with join URL `/join/{slug}?invite={token}`
+- Duplicate email in campaign → same error semantics as tailor invite
+
+**Important:** Coordinator cannot invite another coordinator (validate role !== coordinator in payload).
+
+### 3.3 Mailer
+
+**File:** `src/lib/mailer.ts`
+
+Add `sendCoordinatorMemberInviteEmail({ to, fullName, coordinatorName, campaignName, tailorName, joinUrl, expiresAt? })`
+
+### 3.4 Permissions doc
+
+**File:** `src/lib/auth/permissions.ts`
+
+Document new routes under MeasurementsReadOwn / MeasurementsWriteOwn.
+
+### 3.5 Services & hooks
+
+**File:** `src/services/measurementCampaigns.ts`
+
+Add:
+- `getCoordinatorInvitees(participantId)`
+- `inviteCoordinatorMembers(participantId, payload)`
+- `getCoordinatorGroupLink(participantId)`
+
+**File:** `src/hooks/useMeasurementCampaigns.ts`
+
+Add:
+- `campaignKeys.coordinatorInvitees(participantId)`
+- `useCoordinatorInviteesQuery(participantId, enabled)`
+- `useInviteCoordinatorMembersMutation(participantId)`
+- Invalidate `campaignKeys.mine()` and coordinator invitees on success
+
+### 3.6 Phase 3 verification
+
+- [ ] Non-coordinator gets 403 on coordinator APIs
+- [ ] Coordinator can POST individual invites
+- [ ] Invited member can join with `?invite=` and appears with `invitedByParticipantId` set
+- [ ] Coordinator cannot see other coordinators' invitees
+
+---
+
+## PHASE 4 — Customer UI: Group manager panel
+
+### 4.1 New component
+
+Create **`src/components/Protected/profile/campaigns/CoordinatorGroupPanel.tsx`**
+
+Props: `{ participation: CustomerCampaignParticipationDto }`
+
+UI (Harewa gold `#D4AF37`, stone/gray):
+1. **Group link section**
+   - Show `groupJoinPath` with Copy button
+   - Optional QR placeholder button disabled with tooltip "Coming soon" (match tailor modal pattern)
+2. **Group label** — editable text field → `set-group-label` action
+3. **Progress** — "{completed} of {total} submitted" from `inviteeStats`
+4. **Invite individuals** — mini form: name + optional email, Add row, Send invites
+5. **Invitee list** — table: name, status, copy individual link if inviteToken available (for invited-not-accepted rows, tailor-only token visibility — coordinator API returns joinPath for invitees they created)
+
+Only render when `participation.canInviteMembers === true`.
+
+### 4.2 Integrate into card
+
+**File:** `src/components/Protected/profile/campaigns/CustomerCampaignCard.tsx`
+
+- Import and render `<CoordinatorGroupPanel />` below measurements section when `canInviteMembers`
+- Collapsible on mobile (`details/summary` or state toggle)
+
+**File:** `src/components/Protected/profile/campaigns/CustomerCampaignsSection.tsx`
+
+- Ensure submit modal still works for coordinator
+- After submit, refetch mine query so group panel appears
+
+### 4.3 Phase 4 verification
+
+- [ ] Coordinator sees group panel in `/profile?tab=campaigns`
+- [ ] Copy group link works
+- [ ] Individual invite form works
+- [ ] Non-coordinator does NOT see panel
+- [ ] Customer never sees tailor routes
+
+---
+
+## PHASE 5 — Tailor hierarchical dashboard
+
+### 5.1 Tree API
+
+**File:** `src/lib/measurementCampaigns.ts`
+
+Add:
+
+```typescript
+export async function listCampaignParticipantsTree(
+  tailorProfileId: string,
+  campaignId: string
+): Promise<{
+  coordinators: CampaignParticipantTreeNode[];
+  direct: CampaignParticipantDto[];
+  stats: CampaignStatsDto;
+}>
+```
+
+Logic:
+1. Load all participants for campaign
+2. Split: `direct` = role direct AND no invitedByParticipantId
+3. `coordinators` = role coordinator OR canInviteMembers
+4. Attach `invitees` = participants where invitedByParticipantId = coordinator.id
+5. Sort coordinators by fullName; invitees by invitedAt
+
+Option A: extend existing GET with `?view=tree` query param
+Option B: separate endpoint `/api/tailor/campaigns/[id]/participants/tree`
+
+Pick Option A to avoid duplicate auth — update GET handler.
+
+### 5.2 Tailor UI tree view
+
+**File:** `src/components/Protected/tailor/CampaignParticipantsModal.tsx`
+
+1. Add view toggle: **List** | **By group**
+2. **By group** view:
+   - Section "Coordinators & their groups" — expandable rows
+   - Each coordinator shows: name, status, `{inviteeCompleted}/{inviteeCount} submitted`
+   - Nested invitee rows indented with status badges
+   - Section "Direct participants" — flat list of non-coordinator, non-member-under-coordinator... (direct + orphan members if any)
+3. Remind button on coordinator subtree: remind all pending invitees under that coordinator (optional enhancement — if too large, remind all campaign still OK for v1)
+
+### 5.3 Stats sync
+
+Update stats computation to show:
+- Total coordinators
+- Total members (role=member)
+- Direct participants
+
+Display in modal header stats bar.
+
+### 5.4 Phase 5 verification
+
+- [ ] Tree view matches flat list counts
+- [ ] Expanding coordinator shows all members
+- [ ] Measurement snapshots visible for completed members (existing expand UI)
+
+---
+
+## PHASE 6 — Export, notifications, edge cases
+
+### 6.1 CSV export
+
+**File:** `src/lib/measurementCampaigns.ts` — `buildParticipantsCsv`
+
+Add columns after "Channel":
+- `Role`
+- `Invited by`
+- `Group label`
+
+Populate from DTO fields. Apply to both single-campaign and all-campaign export if exists.
+
+### 6.2 Notifications
+
+**File:** `src/lib/measurementCampaigns.ts`
+
+On events:
+| Event | Notify tailor | Notify coordinator |
+|-------|---------------|-------------------|
+| Member joins via group link | Yes | Yes (best effort) |
+| Member completes measurements | Yes | Yes if under coordinator |
+| Coordinator completes | Yes | — |
+
+Use existing `notifyCampaignOwnerBestEffort` pattern. Add `notifyParticipantBestEffort(userId, ...)` if userId present on coordinator.
+
+### 6.3 Reminders
+
+**File:** `sendCampaignReminders` — no change required for v1 (reminds all pending). Optional: add `coordinatorParticipantId` filter param in Phase 5 enhancement.
+
+### 6.4 Edge cases (MUST handle)
+
+1. **User already direct participant tries group link** — unique `[campaignId, userId]` prevents duplicate; return existing row (no role change)
+2. **Coordinator tries to join own group link** — reject or no-op with message
+3. **Expired campaign** — block join and coordinator invites
+4. **Archived campaign** — block all mutations
+5. **Coordinator demoted** — not in v1 (tailor cannot demote); document as future
+6. **shareToken collision** — regenerate on retry (extremely unlikely)
+7. **`completeCampaignParticipation`** — verify works for members/coordinators (should unchanged; verify participant resolution accepts member rows)
+
+### 6.5 Query invalidation matrix
+
+After any mutation, invalidate:
+
+| Mutation | Invalidate |
+|----------|------------|
+| joinCampaign | `campaignKeys.public(*)`, `campaignKeys.mine()`, `campaignKeys.participants(campaignId)` |
+| coordinator invite | `campaignKeys.mine()`, `campaignKeys.coordinatorInvitees(id)`, `campaignKeys.participants(campaignId)` |
+| tailor invite | `campaignKeys.participants(campaignId)` |
+| submit measurements | `campaignKeys.mine()`, `campaignKeys.participants(campaignId)`, `measurementKeys.*` |
+
+### 6.6 Phase 6 verification
+
+- [ ] CSV includes new columns
+- [ ] Notifications fire on member join/submit
+- [ ] All edge cases return clear error messages (not 500)
+
+---
+
+## PHASE 7 — TailorClient roster bridge (OPTIONAL but recommended)
+
+### 7.1 Schema
+
+Add to `TailorClient`: `userId`, `campaignParticipantId` (see Phase 0)
+
+### 7.2 Link on coordinator join
+
+When participant with matching email joins campaign and role is coordinator:
+- Upsert or update `TailorClient` where phone/email matches → set `userId`, `campaignParticipantId`
+
+### 7.3 Tailor home UI
+
+**File:** `src/components/Protected/tailor/TailorHomePage.tsx`
+
+Show client status chips: "Invited" | "Joined" | "Measurements ✓" when linked to campaign participant.
+
+### 7.4 "Invite client to campaign" action
+
+**File:** `src/components/Protected/tailor/AddClientModal.tsx` or client row menu
+
+- Button "Add to campaign" → opens campaign picker → pre-fills invite with client name/email as coordinator
+
+---
+
+## PHASE 8 — Manual QA checklist (REQUIRED before done)
+
+Run full flow on local/staging:
+
+### Tailor flow
+1. [ ] Create active campaign with sponsored scans > 0
+2. [ ] Invite `alice@test.com` as **coordinator**
+3. [ ] Copy open link still works for direct participants
+4. [ ] Participants modal list + tree views correct
+5. [ ] Export CSV has Role / Invited by / Group label
+6. [ ] Send reminder works
+
+### Coordinator flow (Alice)
+1. [ ] Open email link, sign up new account, verify email
+2. [ ] Join campaign, submit measurements
+3. [ ] `/profile?tab=campaigns` shows Group manager panel
+4. [ ] Copy group link
+5. [ ] Invite `bob@test.com` individually
+6. [ ] Set group label "Bridesmaids"
+
+### Member flow (Bob + Carol)
+1. [ ] Bob opens individual invite, joins, submits
+2. [ ] Carol opens group link (no pre-invite), joins, submits
+3. [ ] Carol sees she is NOT coordinator (no group panel)
+
+### Tailor verification
+1. [ ] Tree: Alice (coordinator) → Bob, Carol (members)
+2. [ ] Measurement snapshots visible for Alice, Bob, Carol
+3. [ ] Direct participants appear in separate section
+
+### Regression
+1. [ ] Existing campaign participants (pre-migration) behave as `direct`
+2. [ ] `/join/[slug]` without params still works
+3. [ ] Tailor email invite (non-coordinator) still works
+4. [ ] AI scan with campaign slug still deducts quota
+5. [ ] Customer vs tailor routes not crossed
+
+---
+
+## File checklist (every file — do not skip)
+
+| File | Action |
+|------|--------|
+| `prisma/schema.prisma` | MODIFY |
+| `src/lib/measurementCampaigns.shared.ts` | MODIFY |
+| `src/lib/measurementCampaigns.ts` | MODIFY (major) |
+| `src/lib/mailer.ts` | MODIFY |
+| `src/lib/auth/permissions.ts` | MODIFY (docs) |
+| `src/app/api/campaigns/join/[slug]/route.ts` | MODIFY |
+| `src/app/api/campaigns/my/route.ts` | no change if list fn updated |
+| `src/app/api/campaigns/my/[participantId]/invitees/route.ts` | CREATE |
+| `src/app/api/tailor/campaigns/[id]/participants/route.ts` | MODIFY (tree query param) |
+| `src/services/measurementCampaigns.ts` | MODIFY |
+| `src/hooks/useMeasurementCampaigns.ts` | MODIFY |
+| `src/components/Public_C/campaigns/JoinCampaignClient.tsx` | MODIFY |
+| `src/components/Public_C/campaigns/CampaignJoinHero.tsx` | MODIFY |
+| `src/components/Protected/profile/campaigns/CustomerCampaignCard.tsx` | MODIFY |
+| `src/components/Protected/profile/campaigns/CustomerCampaignsSection.tsx` | MODIFY (minor) |
+| `src/components/Protected/profile/campaigns/CoordinatorGroupPanel.tsx` | CREATE |
+| `src/components/Protected/tailor/CampaignParticipantsModal.tsx` | MODIFY |
+
+---
+
+## Implementation order for Cursor agent
+
+When user says "implement coordinator flow", execute **in this exact order**:
+
+1. Phase 0 → migrate → generate
+2. Phase 1 (backend join) → Phase 1 UI/hooks sync
+3. Phase 2 (tailor coordinator invite)
+4. Phase 3 (coordinator API)
+5. Phase 4 (customer UI)
+6. Phase 5 (tailor tree)
+7. Phase 6 (export + notifications + edge cases)
+8. Phase 7 (roster bridge) if time
+9. Phase 8 QA — fix until all boxes pass
+
+**Never mark complete with TODOs, stubs, or `enabled: false` for core paths.**
+
+---
+
+## Reference: existing functions to reuse (do not duplicate)
+
+- `inviteToken()` / `resolveCampaignActorAccount()` / `assertInviteeEmailMatches()`
+- `assertCampaignOpenForParticipation()` / `completeCampaignParticipation()`
+- `findCampaignParticipantForUser()` — extend, do not replace
+- `sendCampaignInviteEmail()` — template for coordinator member email
+- `SubmitMeasurementsModal` — unchanged; works post-join
+- `useJoinCampaignMutation` — extend payload only

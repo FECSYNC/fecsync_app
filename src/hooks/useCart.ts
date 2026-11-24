@@ -1,0 +1,263 @@
+// React Query hooks for cart operations
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  getMyCart,
+  addToMyCart,
+  addFabricToMyCart,
+  removeProductFromCartById,
+  updateProductQuantityOptimistic,
+  replaceCartProducts,
+  mapServerCartToStoreItems,
+  createNewEmptyCart,
+  type Cart
+} from '@/services/cart';
+import type { CartLine } from '@/store/cartStore';
+
+/**
+ * Query key factory for cart queries
+ */
+export const cartKeys = {
+  all: ['cart'] as const,
+  mine: () => [...cartKeys.all, 'me'] as const,
+  byId: (id: string) => [...cartKeys.all, id] as const,
+};
+
+/**
+ * Hook to fetch the current user's cart
+ * Cached with React Query, no localStorage needed for logged-in users
+ */
+export function useCartQuery(enabled: boolean = true) {
+  return useQuery<CartLine[], Error>({
+    queryKey: cartKeys.mine(),
+    queryFn: async () => {
+      const cart = await getMyCart();
+      if (!cart) return [];
+
+      const items = mapServerCartToStoreItems(cart);
+      return items;
+    },
+    enabled, // Only run if user is authenticated
+    staleTime: 2 * 60 * 1000, // 2 minutes (cart data changes frequently)
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Don't refetch on every focus
+    retry: 1, // Retry once on failure
+  });
+}
+
+/**
+ * Hook to get the raw cart object (with cartId)
+ * Accepts custom query options for fine-grained control
+ */
+export function useCartRawQuery(enabled: boolean = true, options?: Partial<Parameters<typeof useQuery<Cart | null, Error>>[0]>) {
+  return useQuery<Cart | null, Error>({
+    queryKey: [...cartKeys.mine(), 'raw'],
+    queryFn: async () => {
+      return await getMyCart();
+    },
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    ...options, // Allow custom options to override defaults
+  });
+}
+
+/**
+ * Mutation to add item to cart
+ * Automatically refetches cart on success
+ */
+export function useAddFabricToCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Cart, Error, { fabricId: string; quantity?: number }>({
+    mutationFn: async ({ fabricId, quantity }) => {
+      return await addFabricToMyCart({ fabricId, quantity });
+    },
+    onSuccess: (cart) => {
+      queryClient.setQueryData(cartKeys.mine(), () => {
+        const items = mapServerCartToStoreItems(cart);
+        return items;
+      });
+      queryClient.setQueryData([...cartKeys.mine(), "raw"], cart);
+    },
+  });
+}
+
+export function useAddToCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Cart, Error, { productId: string; quantity?: number; price?: number; productNote?: string }>({
+    mutationFn: async ({ productId, quantity, price, productNote }) => {
+      return await addToMyCart({ productId, quantity, price, productNote });
+    },
+    onSuccess: (cart) => {
+      queryClient.setQueryData(cartKeys.mine(), () => {
+        const items = mapServerCartToStoreItems(cart);
+        return items;
+      });
+      queryClient.setQueryData([...cartKeys.mine(), "raw"], cart);
+    },
+    onError: (error) => {
+      console.error('Failed to add to cart:', error);
+    },
+  });
+}
+
+/**
+ * Type for mutation context (used for optimistic updates rollback)
+ */
+type CartMutationContext = {
+  previousCart: CartLine[] | undefined;
+};
+
+/**
+ * Mutation to update cart item quantity
+ * Uses optimistic updates for instant UI
+ */
+export function useUpdateCartQuantityMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Cart,
+    Error,
+    { cartId: string; productId: string; quantity: number; currentItems: CartLine[] },
+    CartMutationContext
+  >({
+    mutationFn: async ({ cartId, productId, quantity, currentItems }) => {
+      return await updateProductQuantityOptimistic(cartId, productId, quantity, currentItems);
+    },
+    // Optimistic update - update UI immediately
+    onMutate: async ({ productId, quantity, currentItems }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: cartKeys.mine() });
+
+      // Snapshot current value
+      const previousCart = queryClient.getQueryData<CartLine[]>(cartKeys.mine());
+
+      // Optimistically update
+      queryClient.setQueryData<CartLine[]>(cartKeys.mine(), (old) => {
+        if (!old) return [];
+
+        const target = currentItems?.find((i) => i.id === productId);
+        const targetType = target?.lineType ?? "product";
+
+        if (quantity <= 0) {
+          return old.filter(
+            (item) =>
+              !(item.id === productId && (item.lineType ?? "product") === targetType)
+          );
+        }
+
+        return old.map((item) =>
+          item.id === productId && (item.lineType ?? "product") === targetType
+            ? { ...item, quantity }
+            : item
+        );
+      });
+
+      return { previousCart };
+    },
+    // On error, rollback
+    onError: (err, variables, context: CartMutationContext | undefined) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(cartKeys.mine(), context.previousCart);
+      }
+    },
+    // Always refetch after error or success
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: cartKeys.mine() });
+    },
+  });
+}
+
+/**
+ * Mutation to remove item from cart
+ */
+export function useRemoveFromCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Cart,
+    Error,
+    { cartId: string; productId: string; lineType?: string },
+    CartMutationContext
+  >({
+    mutationFn: async ({ cartId, productId, lineType }) => {
+      const { removeCartLineById } = await import("@/services/cart");
+      return await removeCartLineById(cartId, {
+        id: productId,
+        lineType: lineType as "fabric" | "product" | undefined,
+      });
+    },
+    // Optimistic update
+    onMutate: async ({ productId, lineType }) => {
+      await queryClient.cancelQueries({ queryKey: cartKeys.mine() });
+      const previousCart = queryClient.getQueryData<CartLine[]>(cartKeys.mine());
+
+      queryClient.setQueryData<CartLine[]>(cartKeys.mine(), (old) => {
+        if (!old) return [];
+        return old.filter(
+          (item) =>
+            !(item.id === productId && (item.lineType ?? "product") === (lineType ?? "product"))
+        );
+      });
+
+      return { previousCart };
+    },
+    onError: (err, variables, context: CartMutationContext | undefined) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(cartKeys.mine(), context.previousCart);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: cartKeys.mine() });
+    },
+  });
+}
+
+/**
+ * Mutation to replace entire cart (for merge operations)
+ */
+export function useReplaceCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Cart,
+    Error,
+    { cartId: string; products: Array<{ productId: string; quantity: number; price?: number }> }
+  >({
+    mutationFn: async ({ cartId, products }) => {
+      return await replaceCartProducts(cartId, products);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cartKeys.mine() });
+    },
+  });
+}
+
+/**
+ * Mutation to create a new empty cart after payment
+ * Used to separate paid orders from future purchases
+ */
+export function useCreateEmptyCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Cart | null, Error, void>({
+    mutationFn: async () => {
+      return await createNewEmptyCart();
+    },
+    onSuccess: (newCart) => {
+      const cartId = newCart?._id || newCart?.id;
+      console.log('[useCreateEmptyCartMutation] New empty cart created:', cartId);
+
+      // Invalidate cart queries to refetch and get the new cart
+      queryClient.invalidateQueries({ queryKey: cartKeys.all });
+    },
+    onError: (error) => {
+      console.error('[useCreateEmptyCartMutation] Failed to create empty cart:', error);
+    },
+  });
+}
+

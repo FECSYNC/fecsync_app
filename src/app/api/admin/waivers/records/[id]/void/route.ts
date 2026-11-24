@@ -1,0 +1,30 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+import { NextRequest } from "next/server";
+import connectDB from "@/lib/db";
+import { ok, badRequest } from "@/lib/response";
+import { requirePermissionFresh } from "@/lib/middleware/requireAuth";
+import { P } from "@/lib/auth/permissions";
+import { waiverAuthFail, waiverFail } from "@/lib/waivers/http";
+import { voidWaiverRecord } from "@/lib/waivers/desk";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function POST(request: NextRequest, ctx: Ctx) {
+  let actor;
+  try {
+    actor = await requirePermissionFresh(request, P.WaiversVoid);
+  } catch (err) {
+    return waiverAuthFail(err, request, "POST /api/admin/waivers/records/[id]/void", P.WaiversVoid);
+  }
+  try {
+    await connectDB();
+    const body = (await request.json().catch(() => null)) as { reason?: string } | null;
+    const { id } = await ctx.params;
+    const result = await voidWaiverRecord(actor, id, body?.reason ?? "");
+    return ok(result);
+  } catch (err) {
+    return waiverFail(err, request, "POST /api/admin/waivers/records/[id]/void", "Failed to void waiver", actor);
+  }
+}

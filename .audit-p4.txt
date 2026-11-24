@@ -1,0 +1,56 @@
+﻿yarn run v1.22.22
+$ npx tsx scripts/smoke-memberships-phase4.mts
+node.exe : npm warn Unknown env config "argv". This will stop working in the next major version of npm.
+At C:\Users\user\AppData\Roaming\npm\yarn.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/yarn/bin/yarn.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...version of npm.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm warn Unknown env config "cache-folder". This will stop working in the next major version of npm.
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+npm warn Unknown env config "version-commit-hooks". This will stop working in the next major version of npm.
+npm warn Unknown env config "version-git-message". This will stop working in the next major version of npm.
+npm warn Unknown env config "version-git-tag". This will stop working in the next major version of npm.
+npm warn Unknown env config "version-tag-prefix". This will stop working in the next major version of npm.
+PASS client-preset-has-memberships-own
+PASS tailor-preset-lacks-memberships-own
+PASS profile-tab-memberships
+PASS api-rules-registered
+PASS dunning-growth-vs-enterprise ÔÇö growth=0/3/5/7 enterprise=0/2/4/6/9/12/14
+PASS unlinked-list-denied ÔÇö MembershipBillingError: No GuestProfile is linked to this account ÔÇö ask the park desk to link you, or use the link flow with a matching email
+PASS link-email-mismatch-denied ÔÇö MembershipBillingError: Guest profile email must match your account email to link
+PASS link-claimed-profile-denied ÔÇö AuthHttpError: Guest profile is linked to another account
+PASS list-own-only ÔÇö ids=cmue9hmh1000ruq3we8zm85ed
+PASS idor-detail-denied ÔÇö AuthHttpError: Guest membership not found
+PASS idor-cancel-denied ÔÇö AuthHttpError: Guest membership not found
+PASS idor-no-side-effect
+PASS own-detail-ok
+PASS alternative-created
+PASS cancel-requires-confirm ÔÇö MembershipBillingError: Confirmation is required to cancel
+PASS alternatives-offered-first
+PASS offer-does-not-cancel
+PASS alternative-accept-applies-credit ÔÇö credit=500
+[memberships/mail] (no NOTIFICATION_EMAIL_USER) would send: Membership cancelled ÔÇö P4 Plan 1790177473527 ÔåÆ smoke-mem-p4-a-1790177473527@test.local
+PASS click-to-cancel-eop-scheduled
+PASS cancel-eop-already-scheduled ÔÇö MembershipBillingError: End-of-period cancel is already scheduled
+PASS click-to-cancel-disabled ÔÇö MembershipBillingError: Online cancel is disabled for this park ÔÇö contact the venue
+[memberships/mail] (no NOTIFICATION_EMAIL_USER) would send: Membership agreement required ÔÇö P4 Agreement Plan 1790177473527 ÔåÆ smoke-mem-p4-a-1790177473527@test.local
+PASS agreement-blocks-activation ÔÇö status=pending
+PASS agreement-not-accepted-denied ÔÇö MembershipBillingError: Agreement acceptance is required
+PASS agreement-idor-denied ÔÇö AuthHttpError: Guest membership not found
+PASS agreement-sign-activates
+[memberships/mail] (no NOTIFICATION_EMAIL_USER) would send: Membership payment failed ÔÇö P4 Agreement Plan 1790177473527 ÔåÆ smoke-mem-p4-a-1790177473527@test.local
+PASS past-due-marked
+PASS dunning-queue-enterprise-advanced
+PASS report-sold ÔÇö 3
+PASS report-active ÔÇö 1
+PASS report-churn ÔÇö 1
+PASS report-past-due ÔÇö 1
+PASS report-failed-payments ÔÇö 1 / 30
+PASS report-park-scope-matches
+PASS report-hq-rollup-enterprise
+PASS guest-detail-memberships
+
+Done. failed=0
+Done in 321.35s.

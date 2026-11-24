@@ -1,0 +1,322 @@
+"use client";
+
+import { useEffect, useRef } from 'react';
+import { useAuthStore } from '@/store/authStore';
+import { useCartStore } from '@/store/cartStore';
+import { useCartDrawerStore } from '@/store/cartDrawerStore';
+import { useCartQuery, useCartRawQuery, useReplaceCartMutation, cartKeys } from '@/hooks/useCart';
+import { addLinesToMyCart, addFabricToMyCart } from '@/services/cart';
+import { useQueryClient } from '@tanstack/react-query';
+import { CartErrorBoundary } from './cart-error-boundary';
+import { useCartSync } from '@/hooks/useCartSync';
+import { dedupeCartLines } from '@/utils/cartDisplay';
+
+/**
+ * Cart Hydration Component (React Query Version)
+ * 
+ * Automatically syncs cart when user authenticates:
+ * 1. Merges guest cart with server cart on login
+ * 2. Loads server cart for authenticated users
+ * 3. Handles guest cart for non-authenticated users
+ */
+export function CartHydration() {
+  // Use the cart sync hook to keep Zustand in sync with React Query
+  useCartSync();
+  
+  const { isAuthenticated, hasHydratedAuth, user } = useAuthStore();
+  const { 
+    items: localItems,
+    getGuestCart,
+    clearGuestCart,
+    setItems,
+    setCartId,
+    setIsGuestCart,
+    setIsMerging,
+    isMerging,
+  } = useCartStore();
+  const { isOpen: isCartDrawerOpen } = useCartDrawerStore();
+  
+  const queryClient = useQueryClient();
+  const previousAuthStateRef = useRef(isAuthenticated);
+  const hasMergedRef = useRef(false);
+
+  // Fetch server cart for authenticated users (React Query handles caching)
+  const { data: serverCartItems = [], isLoading } = useCartQuery(
+    isAuthenticated && hasHydratedAuth && !isCartDrawerOpen
+  );
+
+  // Also fetch the raw cart to get cartId
+  const { data: rawCart } = useCartRawQuery(
+    isAuthenticated && hasHydratedAuth && !isCartDrawerOpen
+  );
+
+  const replaceCartMutation = useReplaceCartMutation();
+
+  // Sync server cart to local store for UI (including cartId!)
+  // Skip sync when merge is in progress to prevent overwriting merged cart
+  // IMPORTANT: Preserve local sizeBreakdown since server doesn't store it
+  useEffect(() => {
+    if (isMerging) {
+      // Don't sync during merge - merge effect handles the update
+      return;
+    }
+
+    // Wait for login merge so an empty server cart can't wipe guest items
+    if (
+      isAuthenticated &&
+      typeof window !== 'undefined' &&
+      localStorage.getItem('guest_cart')
+    ) {
+      try {
+        const pending = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+        if (Array.isArray(pending) && pending.length > 0 && !hasMergedRef.current) {
+          return;
+        }
+      } catch {
+        /* ignore corrupt guest cart */
+      }
+    }
+    
+    if (isAuthenticated && rawCart) {
+      const cartId = (rawCart as any)._id || (rawCart as any).id;
+      setCartId(cartId);
+      
+      // Get current local items to preserve sizeBreakdown
+      const currentLocalItems = useCartStore.getState().items;
+      
+      // Merge server items with local sizeBreakdown data
+      const mergedItems = serverCartItems.map(serverItem => {
+        const localItem = currentLocalItems.find(local => local.id === serverItem.id);
+        
+        // Check if local has meaningful sizeBreakdown
+        const localHasSizeBreakdown = localItem?.sizeBreakdown && 
+          Object.keys(localItem.sizeBreakdown).length > 0 &&
+          Object.values(localItem.sizeBreakdown).some(qty => qty > 0);
+        
+        // Check if server has meaningful sizeBreakdown  
+        const serverHasSizeBreakdown = serverItem.sizeBreakdown && 
+          Object.keys(serverItem.sizeBreakdown).length > 0 &&
+          Object.values(serverItem.sizeBreakdown).some(qty => qty > 0);
+        
+        return {
+          ...serverItem,
+          // Prefer breakdown-derived total when local size data is ahead of a slow server refetch
+          quantity: localHasSizeBreakdown
+            ? Object.values(localItem!.sizeBreakdown!).reduce(
+                (sum, qty) => sum + Math.max(0, Number(qty) || 0),
+                0
+              ) || serverItem.quantity
+            : serverItem.quantity,
+          // Preserve local metadata
+          name: serverItem.name || localItem?.name,
+          image: serverItem.image || localItem?.image,
+          price: serverItem.price ?? localItem?.price,
+          taxRate:
+            serverItem.taxRate !== undefined
+              ? serverItem.taxRate
+              : localItem?.taxRate,
+          taxExempt:
+            serverItem.taxExempt !== undefined
+              ? Boolean(serverItem.taxExempt)
+              : Boolean(localItem?.taxExempt),
+          // CRITICAL: Prefer local sizeBreakdown since server doesn't store it
+          sizeBreakdown: localHasSizeBreakdown ? localItem!.sizeBreakdown : 
+                         serverHasSizeBreakdown ? serverItem.sizeBreakdown : 
+                         localItem?.sizeBreakdown,
+          productNote: localItem?.productNote || serverItem.productNote,
+          availableSizes: serverItem.availableSizes?.length 
+            ? serverItem.availableSizes 
+            : localItem?.availableSizes || [],
+          remainingInStock:
+            typeof serverItem.remainingInStock === 'number'
+              ? serverItem.remainingInStock
+              : localItem?.remainingInStock,
+          stockBundles:
+            typeof serverItem.stockBundles === 'number'
+              ? serverItem.stockBundles
+              : localItem?.stockBundles,
+        };
+      });
+      
+      setItems(mergedItems);
+      setIsGuestCart(false);
+    }
+  }, [rawCart, serverCartItems, isAuthenticated, setCartId, setItems, setIsGuestCart, isMerging]);
+
+  // Handle login: merge guest cart with server cart
+  useEffect(() => {
+    if (!hasHydratedAuth) return;
+
+    const justLoggedIn = !previousAuthStateRef.current && isAuthenticated;
+    
+    if (justLoggedIn && !hasMergedRef.current) {
+      hasMergedRef.current = true;
+      
+      const guestCart = getGuestCart();
+      
+      if (guestCart.length > 0) {
+        console.log('[CartHydration] Merging guest cart with server cart...');
+        
+        // Set merging flag to prevent sync effect from overwriting
+        setIsMerging(true);
+        
+        // Merge guest items with server items (line-type aware)
+        const merged = dedupeCartLines([...serverCartItems, ...guestCart]);
+        
+        // Optimistically update Zustand immediately with merged cart
+        setItems(merged);
+        setIsGuestCart(false);
+        
+        // If there's a difference, sync guest-only lines to server
+        if (
+          merged.length > serverCartItems.length ||
+          !merged.every(
+            (item, i) =>
+              serverCartItems[i]?.id === item.id &&
+              (serverCartItems[i]?.lineType ?? 'product') === (item.lineType ?? 'product')
+          )
+        ) {
+          const byKey = (line: { id: string; lineType?: string }) =>
+            `${line.lineType ?? 'product'}:${line.id}`;
+          const serverMap = new Map(
+            serverCartItems.map((line) => [byKey(line), Math.max(0, Math.floor(line.quantity || 0))])
+          );
+          const deltaItems = merged
+            .map((line) => {
+              const mergedQty = Math.max(0, Math.floor(line.quantity || 0));
+              const serverQty = serverMap.get(byKey(line)) ?? 0;
+              const delta = mergedQty - serverQty;
+              if (delta <= 0) return null;
+              return { ...line, quantity: delta };
+            })
+            .filter(Boolean) as typeof merged;
+
+          const productLines = deltaItems.filter(
+            (i) => (i.lineType ?? 'product') !== 'fabric'
+          );
+          const fabricLines = deltaItems.filter((i) => i.lineType === 'fabric');
+
+          const mergeRequests: Array<Promise<unknown>> = [];
+
+          if (productLines.length > 0) {
+            mergeRequests.push(
+              addLinesToMyCart(
+                productLines.map((i) => ({
+                  productId: i.id,
+                  quantity: i.quantity,
+                  price: i.price,
+                  productNote: i.productNote as string | undefined,
+                }))
+              )
+            );
+          }
+
+          for (const fabric of fabricLines) {
+            mergeRequests.push(
+              addFabricToMyCart({
+                fabricId: fabric.id,
+                quantity: fabric.quantity,
+              })
+            );
+          }
+
+          Promise.all(mergeRequests)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: cartKeys.mine() });
+              clearGuestCart();
+              console.log('[CartHydration] Guest cart merged successfully');
+              setTimeout(() => {
+                setIsMerging(false);
+              }, 500);
+            })
+            .catch((error) => {
+              console.error('[CartHydration] Failed to merge guest cart:', error);
+              // Keep guest cart as fallback if merge fails
+              setItems(guestCart);
+              setIsGuestCart(true);
+              setIsMerging(false);
+            });
+        } else {
+          // No merge needed, just clear guest cart
+          clearGuestCart();
+          setIsMerging(false);
+        }
+      } else {
+        // No guest cart, just update state
+        setIsGuestCart(false);
+      }
+    }
+
+    // Handle logout: switch to guest mode
+    if (previousAuthStateRef.current && !isAuthenticated) {
+      hasMergedRef.current = false;
+      setIsMerging(false);
+      setIsGuestCart(true);
+      setCartId(null);
+      
+      // Load guest cart from localStorage
+      const guestCart = getGuestCart();
+      if (guestCart.length > 0) {
+        setItems(guestCart);
+      }
+    }
+    
+    previousAuthStateRef.current = isAuthenticated;
+  }, [
+    hasHydratedAuth, 
+    isAuthenticated, 
+    serverCartItems, 
+    getGuestCart, 
+    clearGuestCart, 
+    setIsGuestCart, 
+    setCartId, 
+    setItems,
+    setIsMerging,
+    queryClient
+  ]);
+
+  // Load guest cart on mount (for non-authenticated users)
+  useEffect(() => {
+    if (!isAuthenticated && hasHydratedAuth) {
+      const guestCart = getGuestCart();
+      if (guestCart.length > 0 && localItems.length === 0) {
+        setItems(guestCart);
+      }
+    }
+  }, [isAuthenticated, hasHydratedAuth, getGuestCart, setItems, localItems.length]);
+
+  // Keep guest (and any local) product lines within live stock
+  useEffect(() => {
+    if (!hasHydratedAuth || isAuthenticated) return;
+    if (localItems.length === 0) return;
+    let cancelled = false;
+    const sync = async () => {
+      const { ensureCartLineStock } = await import('@/utils/cartStock');
+      const lines = useCartStore
+        .getState()
+        .items.filter((i) => (i.lineType ?? 'product') !== 'fabric');
+      for (const line of lines) {
+        if (cancelled) return;
+        await ensureCartLineStock(line);
+      }
+    };
+    void sync();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasHydratedAuth, isAuthenticated, localItems.length]);
+
+  // This component doesn't render anything
+  return null;
+}
+
+/**
+ * Wrapper component that provides error boundary for cart-related operations
+ */
+export function CartHydrationWithErrorBoundary() {
+  return (
+    <CartErrorBoundary>
+      <CartHydration />
+    </CartErrorBoundary>
+  );
+}

@@ -1,0 +1,134 @@
+/* Hard locks — brand mark square + proportional type (no Syne stretch) */
+
+html.vf-landing-page .site-header .brand,
+body.vf-landing-page .site-header .brand {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  height: auto !important;
+  max-height: 100%;
+  min-width: 0;
+  transform: none !important;
+  scale: none !important;
+}
+
+html.vf-landing-page .brand-mark,
+body.vf-landing-page .brand-mark,
+html.vf-landing-page .drawer-brand .brand-mark,
+body.vf-landing-page .drawer-brand .brand-mark {
+  display: block !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  overflow: hidden !important;
+  line-height: 0 !important;
+  align-self: center !important;
+  transform: none !important;
+  scale: none !important;
+}
+
+html.vf-landing-page .brand-mark svg,
+body.vf-landing-page .brand-mark svg,
+html.vf-landing-page .drawer-brand .brand-mark svg,
+body.vf-landing-page .drawer-brand .brand-mark svg,
+html.vf-landing-page svg.fecsync-mark,
+body.vf-landing-page svg.fecsync-mark {
+  display: block !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
+  transform: none !important;
+  scale: none !important;
+}
+
+html.vf-landing-page .brand-name,
+body.vf-landing-page .brand-name,
+html.vf-landing-page .brand-signal,
+body.vf-landing-page .brand-signal,
+html.vf-landing-page .brand-signal-main,
+body.vf-landing-page .brand-signal-main,
+html.vf-landing-page .brand-signal-sub,
+body.vf-landing-page .brand-signal-sub,
+html.vf-landing-page .drawer-brand-name,
+body.vf-landing-page .drawer-brand-name {
+  font-family: "Manrope", system-ui, sans-serif !important;
+  font-stretch: 100% !important;
+  font-variation-settings: normal !important;
+  transform: none !important;
+  scale: none !important;
+}
+
+html.vf-landing-page .brand-name,
+body.vf-landing-page .brand-name {
+  white-space: nowrap !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.02em;
+}
+
+html.vf-landing-page .brand-signal,
+body.vf-landing-page .brand-signal {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  line-height: 1.05 !important;
+}
+
+html.vf-landing-page .brand-signal-main,
+body.vf-landing-page .brand-signal-main {
+  display: block !important;
+  width: auto !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html.vf-landing-page .brand-signal-sub,
+body.vf-landing-page .brand-signal-sub {
+  display: block !important;
+  width: auto !important;
+  max-width: 28ch !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.02em;
+  font-size: clamp(0.72rem, 1.6vw, 0.95rem) !important;
+  font-weight: 600 !important;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+@media (max-width: 480px) {
+  html.vf-landing-page .brand-signal,
+  body.vf-landing-page .brand-signal {
+    font-size: clamp(1.2rem, 0.4rem + 6.5vw, 2rem) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  html.vf-landing-page .brand-mark,
+  body.vf-landing-page .brand-mark,
+  html.vf-landing-page .brand-mark svg,
+  body.vf-landing-page .brand-mark svg {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+    max-width: 30px !important;
+    max-height: 30px !important;
+    flex-basis: 30px !important;
+  }
+}

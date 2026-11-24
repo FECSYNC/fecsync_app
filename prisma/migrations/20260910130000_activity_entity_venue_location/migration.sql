@@ -1,0 +1,3 @@
+-- Restored empty migration folder (blocked prisma migrate deploy with P3015).
+-- No DDL: VenueLocation foundation already ships in 20260910120000.
+-- Keep this as a no-op so migration history stays ordered.

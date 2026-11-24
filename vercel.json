@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reconcile-company-subscriptions",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/remind-company-subscriptions",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

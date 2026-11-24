@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Untitled Document.md</title>
+  <style>
+  @import url("https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0-alpha2/katex.min.css");
+
+  body {
+    font-family: Georgia, Cambria, serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #373D49;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Source Sans Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+  h1 { font-size: 2em; }
+  h2 { font-size: 1.5em; }
+  h3 { font-size: 1.25em; }
+  a { color: #35D7BB; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: "Ubuntu Mono", Monaco, monospace;
+    background: #F5F7FA;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #F5F7FA;
+    padding: 1em;
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  .hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0;
+    color: #333;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid #A0AABF;
+    padding-left: 1em;
+    margin-left: 0;
+    font-style: italic;
+    color: #666;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    border: 1px solid #E8E8E8;
+    padding: 0.5em;
+    text-align: left;
+  }
+  th {
+    background: #F5F7FA;
+    font-weight: 600;
+  }
+  #preview .table {
+    width: auto;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+</style>
+</head>
+<body id="preview">
+<h1 class="code-line has-line-data" data-line-start="0" data-line-end="1"><a id="MultiTenant_Business_App_Full_Architecture_Replication_Documentation_0"></a>Multi-Tenant Business App – Full Architecture &amp; Replication Documentation</h1>
+<p class="has-line-data" data-line-start="2" data-line-end="3">This document is the <strong>single source of truth</strong> for multi-company tenancy, RBAC, permissions, data isolation, routing, modules, APIs, and production invariants.</p>
+<p class="has-line-data" data-line-start="4" data-line-end="5"><strong>It is intentionally stack-agnostic.</strong> Concepts map to any backend (Django, NestJS, Laravel, Rails, <a href="http://ASP.NET">ASP.NET</a>, Spring, Go, etc.). Where this repository’s current implementation uses a specific framework, that is noted only as a <em>reference implementation</em>, not a requirement.</p>
+<p class="has-line-data" data-line-start="6" data-line-end="7"><strong>Nothing listed here should be skipped</strong> when replicating the system on another technology.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="10" data-line-end="11"><a id="How_to_read_this_document_10"></a>How to read this document</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Term in this doc</th>
+<th>Meaning (any stack)</th>
+<th>Example names in other stacks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tenant / Account</strong></td>
+<td>The company boundary; all data and roles belong to one Account</td>
+<td><code>organizations</code>, <code>tenants</code>, <code>workspaces</code>, <code>companies</code></td>
+</tr>
+<tr>
+<td><strong>Company Profile</strong></td>
+<td>Presentation/settings for one Account (logo, currency, address)</td>
+<td><code>company_settings</code>, <code>organization_profile</code></td>
+</tr>
+<tr>
+<td><strong>User</strong></td>
+<td>Login identity; always belongs to exactly one Account</td>
+<td><code>users</code> with <code>account_id</code> / <code>tenant_id</code></td>
+</tr>
+<tr>
+<td><strong>Team Member (SubUser)</strong></td>
+<td>Invited staff under an Account; own email/password; shares the company’s data space</td>
+<td><code>memberships</code>, <code>invites</code>, <code>staff_users</code></td>
+</tr>
+<tr>
+<td><strong>Linked User</strong></td>
+<td>The real auth User behind a Team Member (so permission checks work the same way)</td>
+<td><code>membership.user_id</code></td>
+</tr>
+<tr>
+<td><strong>Role (AccountGroup)</strong></td>
+<td>Named permission set <strong>scoped to one Account</strong></td>
+<td><code>roles</code> with unique <code>(account_id, name)</code></td>
+</tr>
+<tr>
+<td><strong>Permission</strong></td>
+<td>Atomic capability string <code>module.action_resource</code></td>
+<td><code>invoices.view_invoice</code>, CASL abilities, policies</td>
+</tr>
+<tr>
+<td><strong>Company Admin</strong></td>
+<td>Account owner acting as themselves (not as a team member session)</td>
+<td><code>is_owner</code>, <code>org_admin</code></td>
+</tr>
+<tr>
+<td><strong>Request company context</strong></td>
+<td>Resolved once per request: current Company Profile for the logged-in actor</td>
+<td>middleware / interceptor / guard</td>
+</tr>
+<tr>
+<td><strong>Visibility filter</strong></td>
+<td>Second layer after tenant filter: admin/full-visibility vs <code>created_by = me</code></td>
+<td>repository scope, RLS policies, query middleware</td>
+</tr>
+<tr>
+<td><strong>Full company visibility</strong></td>
+<td>Role flag: see all rows in the Account (visibility only, not extra authority)</td>
+<td><code>roles.see_all_records</code></td>
+</tr>
+<tr>
+<td><strong>Elevated permissions</strong></td>
+<td>Any business-module permission that proves “full product access”</td>
+<td>used for approval / unlock gate</td>
+</tr>
+<tr>
+<td><strong>Profile-only access</strong></td>
+<td>Unapproved or non-elevated Account: only auth + company profile + dashboard shell</td>
+<td>feature flag / middleware gate</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="30" data-line-end="31"><a id="PART_A_Architecture_blueprint_replicate_on_any_stack_30"></a>PART A — Architecture blueprint (replicate on any stack)</h1>
+<h2 class="code-line has-line-data" data-line-start="32" data-line-end="33"><a id="A1_Architecture_overview_mental_model_32"></a>A1. Architecture overview (mental model)</h2>
+<pre><code class="has-line-data" data-line-start="35" data-line-end="59">Platform super-admin approves Account.is_approved
+        ↓
+Owner → Company Admin role (all permissions) + sees ALL rows for that Account
+        ↓
+Account ──1:1── CompanyProfile   (= request.company / currentCompany)
+   │
+   ├── User (owner + each team member’s linked user)
+   │         every User.account_id = THIS Account
+   ├── Role ──M2M── Permissions
+   │         unique (account_id, role_name)
+   │         never shared across Accounts
+   └── TeamMember ──owned_by── Owner User
+                  ──linked_user── User
+                  session flag: acting_as_team_member_id
+        ↓
+Business rows: account_id and/or company_id + created_by_id
+        ↓
+Layer 1 TENANT:    WHERE account_id = current_account
+Layer 2 VISIBILITY:
+        - Company Admin            → all rows in tenant
+        - full_company_visibility  → all rows in tenant (read visibility)
+        - otherwise                → created_by_id = current_user
+        - model without created_by → non-admin sees EMPTY (safe default)
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="60" data-line-end="61"><a id="Product_rules_nonnegotiable_60"></a>Product rules (non-negotiable)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>#</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>One User belongs to <strong>exactly one</strong> Account (no multi-company switcher in this design).</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Company A and Company B are separate Accounts. They never share roles, teams, or business records.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Roles are always <code>(account_id, role_name)</code> unique. Role “Manager” in A ≠ “Manager” in B.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Team members are always queried under <code>account_owner.account_id = current account</code>.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Every list, detail-by-id, report, export, and API must apply tenant + visibility filters (prevents IDOR).</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Authorization uses <strong>permission codes</strong>, never role <strong>names</strong>.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>UI hiding is not security; every mutating endpoint re-checks permissions server-side.</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="72" data-line-end="73"><a id="Isolation_strategy_chosen_72"></a>Isolation strategy chosen</h3>
+<p class="has-line-data" data-line-start="74" data-line-end="75"><strong>Shared database, row-level tenancy</strong> (not schema-per-tenant, not DB-per-tenant).</p>
+<ul>
+<li class="has-line-data" data-line-start="76" data-line-end="77">Cheaper and simpler to operate.</li>
+<li class="has-line-data" data-line-start="77" data-line-end="78">Requires absolute discipline: one isolation helper used everywhere.</li>
+<li class="has-line-data" data-line-start="78" data-line-end="80">Optional hardening on other stacks: PostgreSQL RLS with <code>SET app.current_account_id</code>, or equivalent.</li>
+</ul>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="82" data-line-end="83"><a id="A2_Development_process_start_production_82"></a>A2. Development process (start → production)</h2>
+<p class="has-line-data" data-line-start="84" data-line-end="85">Build in this order on <strong>any</strong> stack.</p>
+<h3 class="code-line has-line-data" data-line-start="86" data-line-end="87"><a id="Step_1_Tenant_identity_86"></a>Step 1 — Tenant identity</h3>
+<ol>
+<li class="has-line-data" data-line-start="88" data-line-end="89">Create <code>accounts</code> table: <code>id</code>, <code>owner_user_id</code>, <code>name</code>, <code>is_active</code>, <code>is_approved</code> (default false), timestamps.</li>
+<li class="has-line-data" data-line-start="89" data-line-end="90">Create <code>company_profiles</code> table: 1:1 with <code>accounts</code>; branding, currency, address, logo, signature, theme colors.</li>
+<li class="has-line-data" data-line-start="90" data-line-end="91">Create <code>users</code> table: email unique, password hash, profile fields, <strong><code>account_id</code> required</strong>.</li>
+<li class="has-line-data" data-line-start="91" data-line-end="93">On registration: create User → create Account (owner = user) → link <code>user.account_id</code> → assign default locked-down role.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="93" data-line-end="94"><a id="Step_2_Approval_unlock_gate_SaaS_onboarding_93"></a>Step 2 — Approval / unlock gate (SaaS onboarding)</h3>
+<ol>
+<li class="has-line-data" data-line-start="95" data-line-end="96">New Accounts start <code>is_approved = false</code>.</li>
+<li class="has-line-data" data-line-start="96" data-line-end="101">Middleware/interceptor: if Account does <strong>not</strong> have “full access”, allow only:
+<ul>
+<li class="has-line-data" data-line-start="97" data-line-end="98">auth routes (<code>/auth/*</code>)</li>
+<li class="has-line-data" data-line-start="98" data-line-end="99">dashboard / company profile / bank accounts (<code>/dashboard/*</code>)</li>
+<li class="has-line-data" data-line-start="99" data-line-end="100">static/media/admin (platform)</li>
+<li class="has-line-data" data-line-start="100" data-line-end="101"><strong>403</strong> all business modules</li>
+</ul>
+</li>
+<li class="has-line-data" data-line-start="101" data-line-end="104">Define <code>account_has_full_access(account)</code>:
+<ul>
+<li class="has-line-data" data-line-start="102" data-line-end="103"><code>is_approved == true</code> AND</li>
+<li class="has-line-data" data-line-start="103" data-line-end="104">owner has at least one <strong>elevated</strong> (business) permission</li>
+</ul>
+</li>
+<li class="has-line-data" data-line-start="104" data-line-end="110">When platform super-admin sets <code>is_approved = true</code>:
+<ul>
+<li class="has-line-data" data-line-start="105" data-line-end="106">ensure <strong>Company Admin</strong> role exists for that Account</li>
+<li class="has-line-data" data-line-start="106" data-line-end="107">grant it <strong>all</strong> permission codes in the system</li>
+<li class="has-line-data" data-line-start="107" data-line-end="108">assign owner to Company Admin</li>
+<li class="has-line-data" data-line-start="108" data-line-end="110">clear any permission caches</li>
+</ul>
+</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="110" data-line-end="111"><a id="Step_3_RBAC_roles_are_never_global_110"></a>Step 3 — RBAC (roles are never global)</h3>
+<ol>
+<li class="has-line-data" data-line-start="112" data-line-end="113">Maintain a catalog of permissions: <code>module.action_resource</code> (e.g. <code>invoices.view_invoice</code>, <code>invoices.print_invoice</code>).</li>
+<li class="has-line-data" data-line-start="113" data-line-end="114">Table <code>roles</code>: <code>account_id</code>, <code>role_name</code>, <code>full_company_visibility</code>, unique <code>(account_id, role_name)</code>.</li>
+<li class="has-line-data" data-line-start="114" data-line-end="115">Table <code>role_permissions</code>: role ↔ permission.</li>
+<li class="has-line-data" data-line-start="115" data-line-end="116">Table <code>user_roles</code>: user ↔ role; <strong>enforce</strong> <code>user.account_id == role.account_id</code> on every write (DB trigger or app invariant + unit tests).</li>
+<li class="has-line-data" data-line-start="116" data-line-end="118">Optional: store a globally unique role key like <code>acct-{account_id}:{role_name}</code> if your auth library requires unique group names.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="118" data-line-end="119"><a id="Step_4_Team_members_118"></a>Step 4 — Team members</h3>
+<ol>
+<li class="has-line-data" data-line-start="120" data-line-end="121">Table <code>team_members</code>: <code>account_owner_user_id</code>, <code>linked_user_id</code>, email, full_name, password_hash, is_active.</li>
+<li class="has-line-data" data-line-start="121" data-line-end="122">On create: create/sync <code>linked_user</code> with <strong>same <code>account_id</code> as owner</strong>; assign chosen role.</li>
+<li class="has-line-data" data-line-start="122" data-line-end="123">Login: authenticate User <strong>or</strong> TeamMember credentials; if TeamMember, return/session the <code>linked_user</code> and set <code>session.acting_as_team_member_id</code>.</li>
+<li class="has-line-data" data-line-start="123" data-line-end="125">Company context for team members always resolves to the <strong>owner’s</strong> Company Profile (same logo/currency).</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="125" data-line-end="126"><a id="Step_5_Twolayer_data_isolation_mandatory_125"></a>Step 5 — Two-layer data isolation (mandatory)</h3>
+<ol>
+<li class="has-line-data" data-line-start="127" data-line-end="128">Every business table: <code>account_id</code> and/or <code>company_id</code> + <code>created_by_id</code>.</li>
+<li class="has-line-data" data-line-start="128" data-line-end="131">Central function <code>records_visible_to(user, request, Model)</code>:
+<ul>
+<li class="has-line-data" data-line-start="129" data-line-end="130">filter by tenant</li>
+<li class="has-line-data" data-line-start="130" data-line-end="131">then apply visibility rules (admin / full visibility / own rows)</li>
+</ul>
+</li>
+<li class="has-line-data" data-line-start="131" data-line-end="132">Wire <strong>every</strong> list, get-by-id, update, delete, report, export, admin panel, and API through it.</li>
+<li class="has-line-data" data-line-start="132" data-line-end="134">On create: set <code>account_id</code> from <code>user.account_id</code> (or company→account) and <code>created_by_id</code> from current actor.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="134" data-line-end="135"><a id="Step_6_Privilege_escalation_boundaries_134"></a>Step 6 — Privilege escalation boundaries</h3>
+<ol>
+<li class="has-line-data" data-line-start="136" data-line-end="137">When creating/editing a role, a non-superuser may only attach permissions <strong>they already have</strong>.</li>
+<li class="has-line-data" data-line-start="137" data-line-end="138">Never allow non-superusers to assign “manage permissions / manage roles catalog” meta-permissions (would allow self-escalation).</li>
+<li class="has-line-data" data-line-start="138" data-line-end="139">When assigning a role to a user, ensure that role’s permissions ⊆ assigner’s permissions (except approved Account owner / platform super-admin).</li>
+<li class="has-line-data" data-line-start="139" data-line-end="141">After any role/permission change: invalidate permission caches for affected users.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="141" data-line-end="142"><a id="Step_7_Navigation_UI_context_141"></a>Step 7 — Navigation + UI context</h3>
+<ol>
+<li class="has-line-data" data-line-start="143" data-line-end="144">Map each nav item → required view permission(s).</li>
+<li class="has-line-data" data-line-start="144" data-line-end="145">Inject request-wide context: current company, is_company_admin, can_manage_users, is_read_only, show_created_by column, CTAs for “request full access”.</li>
+<li class="has-line-data" data-line-start="145" data-line-end="147">Role UI shows human labels for permissions; <strong>never rename</strong> stored permission codes.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="147" data-line-end="148"><a id="Step_8_Production_hardening_checklist_147"></a>Step 8 — Production hardening checklist</h3>
+<ul>
+<li class="has-line-data" data-line-start="149" data-line-end="150"><input type="checkbox" id="checkbox0"><label for="checkbox0">Detail-by-id uses same tenant+visibility filter (no </label><code>find(id)</code> alone).</li>
+<li class="has-line-data" data-line-start="150" data-line-end="151"><input type="checkbox" id="checkbox1"><label for="checkbox1">Cross-tenant role assignment throws / 403.</label></li>
+<li class="has-line-data" data-line-start="151" data-line-end="152"><input type="checkbox" id="checkbox2"><label for="checkbox2">Company A cannot read Company B’s records with guessed IDs.</label></li>
+<li class="has-line-data" data-line-start="152" data-line-end="153"><input type="checkbox" id="checkbox3"><label for="checkbox3">Team member without </label><code>full_company_visibility</code> cannot see coworker rows.</li>
+<li class="has-line-data" data-line-start="153" data-line-end="154"><input type="checkbox" id="checkbox4"><label for="checkbox4">Removing a team member clears their role memberships.</label></li>
+<li class="has-line-data" data-line-start="154" data-line-end="155"><input type="checkbox" id="checkbox5"><label for="checkbox5">New modules’ permissions auto-sync onto Company Admin (migration hook / job).</label></li>
+<li class="has-line-data" data-line-start="155" data-line-end="156"><input type="checkbox" id="checkbox6"><label for="checkbox6">Audit log rows store </label><code>account_id</code>.</li>
+<li class="has-line-data" data-line-start="156" data-line-end="158"><input type="checkbox" id="checkbox7"><label for="checkbox7">Document numbers / unique business keys scoped per company where needed.</label></li>
+</ul>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="160" data-line-end="161"><a id="A3_Data_model_generic_schema_160"></a>A3. Data model (generic schema)</h2>
+<h3 class="code-line has-line-data" data-line-start="162" data-line-end="163"><a id="A31_accounts_Tenant_162"></a>A3.1 <code>accounts</code> (Tenant)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>PK</td>
+<td>Tenant id</td>
+</tr>
+<tr>
+<td>owner_user_id</td>
+<td>FK → users, nullable on delete SET NULL</td>
+<td>Company Admin identity</td>
+</tr>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>Display name</td>
+</tr>
+<tr>
+<td>is_active</td>
+<td>bool</td>
+<td>Soft disable</td>
+</tr>
+<tr>
+<td>is_approved</td>
+<td>bool default false</td>
+<td>Gates full product access</td>
+</tr>
+<tr>
+<td>created_at / updated_at</td>
+<td>datetime</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="173" data-line-end="174"><a id="A32_company_profiles_173"></a>A3.2 <code>company_profiles</code></h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td>account_id</td>
+<td>FK → accounts, unique</td>
+<td>One profile per tenant</td>
+</tr>
+<tr>
+<td>user_id</td>
+<td>FK → users, unique</td>
+<td>Legacy/owner link</td>
+</tr>
+<tr>
+<td>company_name, email, phone, website</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>address_line_1/2, city, state, postal_code, country</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>business_type, tax_id, registration_number</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>currency_code, currency_symbol, default_tax</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>logo, signature</td>
+<td>file</td>
+<td></td>
+</tr>
+<tr>
+<td>show_bank_details, show_signature</td>
+<td>bool</td>
+<td></td>
+</tr>
+<tr>
+<td>primary_color, secondary_color, accent_color, text_color</td>
+<td></td>
+<td>Theme</td>
+</tr>
+<tr>
+<td>created_at / updated_at</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="189" data-line-end="190"><a id="A33_bank_accounts_189"></a>A3.3 <code>bank_accounts</code></h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>company_id</td>
+<td>FK → company_profiles</td>
+</tr>
+<tr>
+<td>bank_name, account_name, account_number, account_type</td>
+<td></td>
+</tr>
+<tr>
+<td>routing_number, swift_code, iban</td>
+<td>optional</td>
+</tr>
+<tr>
+<td>is_default, is_active</td>
+<td>only one default per company (enforce on save)</td>
+</tr>
+<tr>
+<td><strong>unique</strong></td>
+<td><code>(company_id, account_number)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="199" data-line-end="200"><a id="A34_users_199"></a>A3.4 <code>users</code></h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>email</td>
+<td>unique; login identifier</td>
+</tr>
+<tr>
+<td>password_hash</td>
+<td></td>
+</tr>
+<tr>
+<td>account_id</td>
+<td>FK → accounts (<strong>required</strong> for normal users)</td>
+</tr>
+<tr>
+<td>first_name, last_name, phone, profile fields</td>
+<td></td>
+</tr>
+<tr>
+<td>is_active, is_platform_staff, is_superuser</td>
+<td>platform flags ≠ tenant roles</td>
+</tr>
+<tr>
+<td>force_password_change</td>
+<td>e.g. HR-created portal accounts</td>
+</tr>
+<tr>
+<td>date_joined</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="211" data-line-end="212"><a id="A35_team_members_SubUser_211"></a>A3.5 <code>team_members</code> (SubUser)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>account_owner_user_id</td>
+<td>FK → users (the Account owner)</td>
+</tr>
+<tr>
+<td>linked_user_id</td>
+<td>unique FK → users (RBAC identity)</td>
+</tr>
+<tr>
+<td>email</td>
+<td>unique login</td>
+</tr>
+<tr>
+<td>full_name</td>
+<td></td>
+</tr>
+<tr>
+<td>password_hash</td>
+<td></td>
+</tr>
+<tr>
+<td>is_active</td>
+<td></td>
+</tr>
+<tr>
+<td>is_staff</td>
+<td><strong>legacy only</strong>; do not use for authorization</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="223" data-line-end="224"><a id="A36_roles_AccountGroup_223"></a>A3.6 <code>roles</code> (AccountGroup)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>account_id</td>
+<td>FK → accounts</td>
+</tr>
+<tr>
+<td>role_name</td>
+<td>human name within account</td>
+</tr>
+<tr>
+<td>full_company_visibility</td>
+<td>bool: see all company rows</td>
+</tr>
+<tr>
+<td><strong>unique</strong></td>
+<td><code>(account_id, role_name)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="232" data-line-end="233"><a id="A37_permissions_catalog_232"></a>A3.7 <code>permissions</code> (catalog)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>code</td>
+<td>e.g. <code>invoices.view_invoice</code> (stable; never rename)</td>
+</tr>
+<tr>
+<td>module</td>
+<td>for UI grouping</td>
+</tr>
+<tr>
+<td>label</td>
+<td>human-readable for Role Create/Edit UI</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="240" data-line-end="241">Standard pattern per resource: <code>view_</code>, <code>add_</code>, <code>change_</code>, <code>delete_</code>, plus custom <code>print_</code>, <code>download_</code>, <code>can_approve_*</code>, dashboard perms, etc.</p>
+<h3 class="code-line has-line-data" data-line-start="242" data-line-end="243"><a id="A38_role_permissions_user_roles_242"></a>A3.8 <code>role_permissions</code> / <code>user_roles</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="244" data-line-end="245">M2M role ↔ permission</li>
+<li class="has-line-data" data-line-start="245" data-line-end="246">M2M user ↔ role</li>
+<li class="has-line-data" data-line-start="246" data-line-end="248">Invariant on assign: <code>user.account_id == role.account_id</code></li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="248" data-line-end="249"><a id="A39_user_sessions_user_activities_security_248"></a>A3.9 <code>user_sessions</code> / <code>user_activities</code> (security)</h3>
+<ul>
+<li class="has-line-data" data-line-start="250" data-line-end="251">Session: user, optional team_member, device, IP, geo, login/logout, is_active</li>
+<li class="has-line-data" data-line-start="251" data-line-end="253">Activity: <strong>account_id</strong>, user, team_member, type (LOGIN, CREATE, UPDATE, DELETE, PERMISSION_CHANGE, …), object refs, changes JSON, deleted_data JSON</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="253" data-line-end="254"><a id="A310_Business_entity_pattern_every_module_253"></a>A3.10 Business entity pattern (every module)</h3>
+<pre><code class="has-line-data language-text" data-line-start="256" data-line-end="264">id
+account_id          # and/or company_id → company_profiles → accounts
+created_by_id       # FK users — required for team-member row isolation
+...domain fields...
+created_at / updated_at
+
+Indexes: (account_id, created_at DESC), (account_id, created_by_id), ...
+</code></pre>
+<p class="has-line-data" data-line-start="265" data-line-end="266">On save if missing: set <code>account_id</code> from actor’s account; set <code>created_by_id</code> from actor.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="269" data-line-end="270"><a id="A4_Request_pipeline_middleware_interceptors_269"></a>A4. Request pipeline (middleware / interceptors)</h2>
+<p class="has-line-data" data-line-start="271" data-line-end="272">Implement as middleware, Nest guards/interceptors, Laravel middleware, Rails around_action, <a href="http://ASP.NET">ASP.NET</a> middleware, etc. <strong>Order matters.</strong></p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Order</th>
+<th>Concern</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Canonical host (dev)</td>
+<td>Optional: unify localhost vs 127.0.0.1 for cookies</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Compression / CORS / security headers</td>
+<td>Standard</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Session</td>
+<td>Cookie/JWT session establishment</td>
+</tr>
+<tr>
+<td>4</td>
+<td>CSRF (cookie sessions)</td>
+<td>If using cookie auth for browsers</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Authentication</td>
+<td>Resolve current User</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Session invalidation</td>
+<td>If session row force-deleted → logout + redirect login <code>?reason=admin_logout</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Company context</strong></td>
+<td><code>request.company = resolveCompanyProfile(user, session)</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Account approval gate</strong></td>
+<td>If not full access → allowlist paths only; else 403</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Messages / flash</td>
+<td>Optional</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Permission audit logging</td>
+<td>Log 403s; optionally log grants on sensitive paths</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Cache-control for dynamic lists</td>
+<td>no-store for mutating business UIs</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Activity tracking</td>
+<td>Audit significant actions</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="288" data-line-end="289"><a id="Company_context_resolution_SSOT_288"></a>Company context resolution (SSOT)</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="291" data-line-end="301">resolveCompanyProfile(user, request):
+  if not authenticated: return null
+  // 1. Owner direct profile
+  if user.company_profile: return it
+  // 2. Via account (works for owners AND team linked users)
+  if user.account.company_profile: return it
+  if user.account.owner.company_profile: return it  // legacy
+  // 3. Via session team_member_id → owner.account.company_profile
+  return null only if account truly has no profile
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="302" data-line-end="303"><a id="Approval_allowlist_profileonly_Accounts_302"></a>Approval allowlist (profile-only Accounts)</h3>
+<p class="has-line-data" data-line-start="304" data-line-end="305">Allowed prefixes when <code>account_has_full_access</code> is false:</p>
+<ul>
+<li class="has-line-data" data-line-start="306" data-line-end="307"><code>/admin/</code> (platform)</li>
+<li class="has-line-data" data-line-start="307" data-line-end="308"><code>/auth/</code></li>
+<li class="has-line-data" data-line-start="308" data-line-end="309"><code>/dashboard/</code> (company profile, bank accounts, shell APIs)</li>
+<li class="has-line-data" data-line-start="309" data-line-end="311"><code>/static/</code>, <code>/media/</code>, favicon, service worker</li>
+</ul>
+<p class="has-line-data" data-line-start="311" data-line-end="312">Everything else → <strong>HTTP 403</strong> with message that company has profile-only access until platform unlocks full access.</p>
+<h3 class="code-line has-line-data" data-line-start="313" data-line-end="314"><a id="Full_access_predicate_313"></a>Full access predicate</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="316" data-line-end="323">account_has_full_access(account):
+  if account is null: treat as true (edge) or false — pick one and test
+  if not account.is_approved: return false
+  owner = account.owner
+  if not owner: return true  // legacy fallback — prefer false in new builds
+  return owner.hasAnyPermission(ELEVATED_PERMISSIONS)
+</code></pre>
+<p class="has-line-data" data-line-start="324" data-line-end="325"><code>ELEVATED_PERMISSIONS</code> = union of all business nav view permissions (clients, invoices, quotations, receipts, job orders, waybills, requisitions, inventory, expense, finance, accounting, messaging, mailing, team/roles, activity, HR, attendance, payroll, documents, notifications, reports, dashboard, video calls, …). <strong>Not</strong> only <code>core.view_companyprofile</code>.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="328" data-line-end="329"><a id="A5_Data_isolation_algorithm_copy_this_verbatim_into_any_stack_328"></a>A5. Data isolation algorithm (copy this verbatim into any stack)</h2>
+<h3 class="code-line has-line-data" data-line-start="330" data-line-end="331"><a id="Who_is_company_admin_330"></a>Who is company admin?</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="333" data-line-end="344">is_company_admin(user, request):
+  if not authenticated: return false
+  if not user.account_id: return false
+  if request.session.acting_as_team_member_id: return false   // critical
+  account = load Account(user.account_id)
+  if not account: return false
+  if account.owner_id is null:
+    set owner_id = user.id   // backfill once
+    return true
+  return account.owner_id == user.id
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="345" data-line-end="346"><a id="Visibility_345"></a>Visibility</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="348" data-line-end="355">visible_to(queryset_already_tenant_filtered, user, request, model):
+  if not authenticated: return empty
+  if is_company_admin(user, request): return queryset
+  if is_read_only_or_full_visibility(user): return queryset
+  if model has no created_by field: return empty   // SAFE DEFAULT
+  return queryset.filter(created_by_id = user.id)
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="356" data-line-end="357"><a id="Full_visibility_readonly_helpers_356"></a>Full visibility / read-only helpers</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="359" data-line-end="371">has_full_company_visibility(user):
+  return user has any Role where role.account_id = user.account_id
+         AND role.full_company_visibility = true
+
+user_has_only_view_permissions(user):
+  perms = all permission codes on user's roles
+  if empty: return false
+  every code starts with view_ OR print_ OR download_
+
+is_read_only_user(user):
+  return has_full_company_visibility(user) OR user_has_only_view_permissions(user)
+</code></pre>
+<p class="has-line-data" data-line-start="372" data-line-end="373">Mutation block (POST/PUT/PATCH/DELETE): only when <code>has_full_company_visibility</code> <strong>AND</strong> <code>user_has_only_view_permissions</code>. If admin assigned add/change/delete to that role, allow mutations.</p>
+<h3 class="code-line has-line-data" data-line-start="374" data-line-end="375"><a id="Tenant_visibility_entry_points_implement_all_three_374"></a>Tenant + visibility entry points (implement all three)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Surface</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web controllers / handlers</td>
+<td><code>for_user_queryset(Model, user, request, account_lookup)</code></td>
+</tr>
+<tr>
+<td>Class-based / resource controllers</td>
+<td>mixin that overrides <code>get_queryset</code></td>
+</tr>
+<tr>
+<td>REST APIs</td>
+<td><code>filter_queryset_for_user(qs, request, account_lookup)</code></td>
+</tr>
+<tr>
+<td>Admin / back-office</td>
+<td>account-scoped admin base class</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="383" data-line-end="384"><code>account_lookup</code>:</p>
+<ul>
+<li class="has-line-data" data-line-start="385" data-line-end="386"><code>'account'</code> / <code>account_id</code> — Invoice, Receipt, Requisition, Waybill, Product, Inventory, Expense, Conversation, …</li>
+<li class="has-line-data" data-line-start="386" data-line-end="388"><code>'company__account'</code> / join company → account — Client, Accounting Transaction, Document, …</li>
+</ul>
+<pre><code class="has-line-data language-pseudo" data-line-start="389" data-line-end="395">for_user_queryset(Model, user, request, account_lookup='account'):
+  account = get_account_for_user(user)
+  if not account: return empty
+  qs = Model.filter(account_lookup → account)
+  return visible_to(qs, user, request, Model)
+</code></pre>
+<pre><code class="has-line-data language-pseudo" data-line-start="397" data-line-end="403">get_account_for_user(user):
+  if user.account: return it
+  if user.account_id: load by id
+  if user.linked_team_member.account_owner.account: return that
+  return null
+</code></pre>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="406" data-line-end="407"><a id="A6_RBAC_system_generic_406"></a>A6. RBAC system (generic)</h2>
+<h3 class="code-line has-line-data" data-line-start="408" data-line-end="409"><a id="Default_roles_408"></a>Default roles</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Role name</th>
+<th>Permissions</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Company Profile Viewer</strong></td>
+<td>only <code>core.view_companyprofile</code></td>
+<td>Every new registration</td>
+</tr>
+<tr>
+<td><strong>Company Admin</strong></td>
+<td><strong>all</strong> permission codes in catalog</td>
+<td>When Account approved; kept in sync on migrations</td>
+</tr>
+<tr>
+<td>Custom roles</td>
+<td>Exactly what Account admin assigns</td>
+<td>Owner/admins create under <code>/auth/security/roles/</code></td>
+</tr>
+<tr>
+<td>Roles with <code>full_company_visibility=true</code></td>
+<td>Whatever perms assigned; see all rows</td>
+<td>e.g. “Company Read Only”, “Finance Viewer”</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="417" data-line-end="418">Do <strong>not</strong> authorize by role name. Authorize by permission codes. <code>full_company_visibility</code> is the only special role <strong>flag</strong> (visibility).</p>
+<h3 class="code-line has-line-data" data-line-start="419" data-line-end="420"><a id="Permission_check_patterns_419"></a>Permission check patterns</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Guard</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>require_login</code></td>
+<td>Unauthenticated → login redirect / 401</td>
+</tr>
+<tr>
+<td><code>require_permission(code)</code></td>
+<td>Must have code → else 403</td>
+</tr>
+<tr>
+<td><code>company_admin_OR_permission(code)</code></td>
+<td>Company admin bypass OR has code</td>
+</tr>
+<tr>
+<td><code>company_admin_OR_any(codes[])</code></td>
+<td>Admin OR any of list</td>
+</tr>
+<tr>
+<td><code>require_not_read_only</code></td>
+<td>Block mutating methods for view-only full-visibility users</td>
+</tr>
+<tr>
+<td>REST method map</td>
+<td>GET→view, POST→add, PUT/PATCH→change, DELETE→delete</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="430" data-line-end="431"><a id="Privilege_boundaries_when_editing_roles_430"></a>Privilege boundaries when editing roles</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="433" data-line-end="445">permissions_user_may_assign(assigner):
+  if assigner.is_superuser: return ALL
+  return assigner's permissions
+         MINUS meta &quot;manage permission catalog / manage global groups&quot; codes
+
+role_permissions_are_subset_of_user(role, assigner):
+  every permission on role ∈ assigner's permissions
+
+roles_assigner_may_assign(account, assigner):
+  if superuser OR (approved account owner): all roles in account
+  else: roles where role_permissions_are_subset_of_user
+</code></pre>
+<p class="has-line-data" data-line-start="446" data-line-end="447">Non-delegatable meta permissions (never assignable by non-superuser in role UI):</p>
+<ul>
+<li class="has-line-data" data-line-start="448" data-line-end="449">manage permission definitions (add/change/delete/view permission catalog)</li>
+<li class="has-line-data" data-line-start="449" data-line-end="451">manage global auth groups (add/change/delete/view group) when those would escalate</li>
+</ul>
+<h3 class="code-line has-line-data" data-line-start="451" data-line-end="452"><a id="Role_services_required_operations_451"></a>Role services (required operations)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Operation</th>
+<th>Invariants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_role(account, name, perm_codes[], full_visibility?)</code></td>
+<td>unique name per account; attach only allowed perms</td>
+</tr>
+<tr>
+<td><code>update_role_permissions(role, perm_codes[])</code></td>
+<td>exact replace; no auto-adding “dependency” perms</td>
+</tr>
+<tr>
+<td><code>assign_user_to_role(user, role)</code></td>
+<td><code>user.account_id == role.account_id</code> or throw</td>
+</tr>
+<tr>
+<td><code>set_user_single_role(user, role|null)</code></td>
+<td>remove all roles of that account, then add one</td>
+</tr>
+<tr>
+<td><code>delete_role(role)</code></td>
+<td>remove from all users → delete role + mappings</td>
+</tr>
+<tr>
+<td><code>get_or_create_default_viewer_role(account)</code></td>
+<td>Company Profile Viewer</td>
+</tr>
+<tr>
+<td><code>get_or_create_company_admin_role(account)</code></td>
+<td>all perms</td>
+</tr>
+<tr>
+<td><code>sync_all_permissions_to_company_admins()</code></td>
+<td>after migrations / new modules</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="464" data-line-end="465"><a id="Auth_login_for_team_members_464"></a>Auth login for team members</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="467" data-line-end="483">authenticate(email, password):
+  user = find User by email
+  if user and password ok and active: return user
+  team = find TeamMember by email and active
+  if team and password ok:
+    linked = ensure_linked_user(team)  // same account as owner
+    return linked
+  return null
+
+on_login_success(user, session):
+  clear session.acting_as_team_member_id
+  if user has linked_team_member:
+    session.acting_as_team_member_id = that id
+    force user.account_id = owner.account_id
+  create security session row + LOGIN activity (with account_id)
+</code></pre>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="486" data-line-end="487"><a id="A7_Lifecycle_flows_endtoend_486"></a>A7. Lifecycle flows (end-to-end)</h2>
+<h3 class="code-line has-line-data" data-line-start="488" data-line-end="489"><a id="Flow_1_Company_registers_488"></a>Flow 1 — Company registers</h3>
+<ol>
+<li class="has-line-data" data-line-start="490" data-line-end="491"><code>POST /auth/register/</code> creates User.</li>
+<li class="has-line-data" data-line-start="491" data-line-end="492">Hook: create Account(owner=user), set user.account_id, create Company Profile Viewer role, assign user.</li>
+<li class="has-line-data" data-line-start="492" data-line-end="494">User can log in but business modules blocked until approval + elevated owner perms.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="494" data-line-end="495"><a id="Flow_2_Platform_approves_Account_494"></a>Flow 2 — Platform approves Account</h3>
+<ol>
+<li class="has-line-data" data-line-start="496" data-line-end="497">Super-admin sets <code>accounts.is_approved = true</code>.</li>
+<li class="has-line-data" data-line-start="497" data-line-end="498">Hook: create/update Company Admin with ALL permissions; assign owner; clear caches.</li>
+<li class="has-line-data" data-line-start="498" data-line-end="500">Owner sees full nav; can create custom roles and invite team.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="500" data-line-end="501"><a id="Flow_3_Owner_creates_roles_500"></a>Flow 3 — Owner creates roles</h3>
+<p class="has-line-data" data-line-start="502" data-line-end="503">Routes under <code>/auth/security/roles/</code> (see Part B). Always scoped:</p>
+<pre><code class="has-line-data language-pseudo" data-line-start="505" data-line-end="509">account = request.company.account OR request.user.account
+roles = Role.where(account_id = account.id)
+get role by id MUST include account_id = account.id else 404
+</code></pre>
+<h3 class="code-line has-line-data" data-line-start="510" data-line-end="511"><a id="Flow_4_Owner_adds_team_member_510"></a>Flow 4 — Owner adds team member</h3>
+<ol>
+<li class="has-line-data" data-line-start="512" data-line-end="513">Requires at least one assignable role.</li>
+<li class="has-line-data" data-line-start="513" data-line-end="514">Create TeamMember under <code>account.owner</code>; create linked User with same account_id; <code>set_user_single_role</code>.</li>
+<li class="has-line-data" data-line-start="514" data-line-end="516">List always: <code>TeamMember.where(account_owner.account_id = account.id)</code>.</li>
+</ol>
+<h3 class="code-line has-line-data" data-line-start="516" data-line-end="517"><a id="Flow_5_Team_member_works_516"></a>Flow 5 — Team member works</h3>
+<ol>
+<li class="has-line-data" data-line-start="518" data-line-end="519">Logs in with own email; session marks team member.</li>
+<li class="has-line-data" data-line-start="519" data-line-end="520"><code>is_company_admin</code> = false → sees only own rows (unless full_company_visibility).</li>
+<li class="has-line-data" data-line-start="520" data-line-end="521">Features gated by role permissions.</li>
+<li class="has-line-data" data-line-start="521" data-line-end="523">Company logo/currency from owner’s Company Profile.</li>
+</ol>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="525" data-line-end="526"><a id="A8_Conditions_matrix_every_critical_gate_525"></a>A8. Conditions matrix (every critical gate)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>#</th>
+<th>Condition</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>No <code>user.account_id</code></td>
+<td>Empty querysets; forbid team/role management</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Account not approved OR owner lacks elevated perms</td>
+<td>Profile-only middleware</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>session.acting_as_team_member_id</code> set</td>
+<td>Not company admin for visibility/bypass</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>user.id == account.owner_id</code> and no team session</td>
+<td>Admin: all rows + admin-OR-perm bypass</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Role has <code>full_company_visibility</code></td>
+<td>See all tenant rows</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Full visibility + only view/print/download</td>
+<td>Mutations → 403</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Team member, no full visibility</td>
+<td>Only <code>created_by = me</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Model without <code>created_by</code></td>
+<td>Non-admin → empty</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Assign user to foreign Account’s role</td>
+<td>Error / 403</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Role id outside current account</td>
+<td>404</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Assign permission you don’t have</td>
+<td>Validation error</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Team CRUD without matching account scope</td>
+<td>403 / not found</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Cannot delete Account owner as team member</td>
+<td>Error</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Unique business keys</td>
+<td>Scoped per company/account</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="546" data-line-end="547"><a id="A9_Porting_guide_same_design_other_stacks_546"></a>A9. Porting guide (same design, other stacks)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Concern</th>
+<th>Generic approach</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tenant column</td>
+<td><code>account_id</code> on every business table</td>
+<td>Prisma, Eloquent, ActiveRecord, EF, TypeORM</td>
+</tr>
+<tr>
+<td>Isolation</td>
+<td>Repository method / global query scope / RLS</td>
+<td>Nest interceptor, Laravel global scope, Rails default_scope (careful), Postgres RLS</td>
+</tr>
+<tr>
+<td>Permissions</td>
+<td>Policy classes or CASL/CASBIN/Spatie</td>
+<td><code>@RequirePermission</code>, Gates, Pundit, Policy</td>
+</tr>
+<tr>
+<td>Roles per tenant</td>
+<td><code>roles.account_id</code> + unique name</td>
+<td>Spatie teams, custom Role model</td>
+</tr>
+<tr>
+<td>Request company</td>
+<td>Middleware sets <code>req.company</code></td>
+<td>Express/Nest middleware, Laravel, Rails</td>
+</tr>
+<tr>
+<td>Approval gate</td>
+<td>Middleware allowlist</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Team login</td>
+<td>Dual credential lookup → linked user</td>
+<td>Passport strategy, Laravel guard, Devise</td>
+</tr>
+<tr>
+<td>Admin panel</td>
+<td>Scope querysets by account</td>
+<td>ActiveAdmin, Filament, Django Admin equivalent</td>
+</tr>
+<tr>
+<td>Realtime</td>
+<td>Channels/WebSockets scoped by account membership</td>
+<td><a href="http://Socket.io">Socket.io</a> rooms <code>account:{id}</code></td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Cross-tenant IDOR tests mandatory</td>
+<td>Integration suite</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="561" data-line-end="562"><strong>Reference implementation in this repo (optional):</strong> Django + custom User + AccountGroup wrapping auth Groups. You do <strong>not</strong> need Django Groups; any role↔permission tables work if invariants hold.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="565" data-line-end="566"><a id="PART_B_Module_catalog_routing_APIs_full_inventory_565"></a>PART B — Module catalog, routing, APIs (full inventory)</h1>
+<h2 class="code-line has-line-data" data-line-start="567" data-line-end="568"><a id="B1_System_overview_567"></a>B1. System overview</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App type</td>
+<td>Multi-tenant business / operations platform</td>
+</tr>
+<tr>
+<td>Tenancy</td>
+<td>Shared DB, Account-scoped rows</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>Email + password; User or Team Member credentials</td>
+</tr>
+<tr>
+<td>Login path</td>
+<td><code>/auth/login/</code></td>
+</tr>
+<tr>
+<td>Post-login</td>
+<td><code>/dashboard/</code></td>
+</tr>
+<tr>
+<td>Landing</td>
+<td><code>/</code> → <code>/dashboard/landing/</code></td>
+</tr>
+<tr>
+<td>Logout redirect</td>
+<td><code>/dashboard/landing/</code></td>
+</tr>
+<tr>
+<td>Platform admin</td>
+<td><code>/admin/</code></td>
+</tr>
+<tr>
+<td>403 handler</td>
+<td>Role-aware message (owner vs team member)</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="581" data-line-end="582"><a id="Modules_logical_apps_581"></a>Modules (logical apps)</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>accounts</strong></td>
+<td>Users, team members, roles, security, sessions, activity</td>
+</tr>
+<tr>
+<td><strong>core</strong></td>
+<td>Dashboard, company profile, bank accounts, tenant, isolation helpers, summaries</td>
+</tr>
+<tr>
+<td><strong>invoices</strong></td>
+<td>Invoices + templates</td>
+</tr>
+<tr>
+<td><strong>receipts</strong></td>
+<td>Receipts linked to invoices</td>
+</tr>
+<tr>
+<td><strong>requisitions</strong></td>
+<td>Requisitions + approval workflow</td>
+</tr>
+<tr>
+<td><strong>waybills</strong></td>
+<td>Waybills + templates</td>
+</tr>
+<tr>
+<td><strong>job_orders</strong></td>
+<td>Products/job orders, orders, customers, stores, leaves</td>
+</tr>
+<tr>
+<td><strong>quotations</strong></td>
+<td>Quotations + templates, convert to invoice</td>
+</tr>
+<tr>
+<td><strong>inventory</strong></td>
+<td>Stock in/out, balances, approval</td>
+</tr>
+<tr>
+<td><strong>store</strong></td>
+<td>Store / waste / layouts (related inventory domain)</td>
+</tr>
+<tr>
+<td><strong>expense</strong></td>
+<td>Expenses + approval</td>
+</tr>
+<tr>
+<td><strong>clients</strong></td>
+<td>Clients (company-scoped)</td>
+</tr>
+<tr>
+<td><strong>accounting</strong></td>
+<td>Transactions, ledger, reports, sync</td>
+</tr>
+<tr>
+<td><strong>messaging</strong></td>
+<td>Conversations, messages, presence, calls (WebSocket)</td>
+</tr>
+<tr>
+<td><strong>mailing</strong></td>
+<td>Bulk email campaigns</td>
+</tr>
+<tr>
+<td><strong>hr_staff</strong></td>
+<td>HR employees, departments, leave, etc.</td>
+</tr>
+<tr>
+<td><strong>payroll</strong></td>
+<td>Payroll records / offline sync</td>
+</tr>
+<tr>
+<td><strong>notifications</strong></td>
+<td>In-app notifications</td>
+</tr>
+<tr>
+<td><strong>sync_api</strong></td>
+<td>Offline-first sync under <code>/api/v1/</code></td>
+</tr>
+<tr>
+<td><strong>smart_attendance</strong></td>
+<td>Biometric devices, push, live logs</td>
+</tr>
+<tr>
+<td><strong>documents</strong></td>
+<td>Document upload + AI pipeline</td>
+</tr>
+<tr>
+<td><strong>extraction</strong></td>
+<td>OCR / PDF extraction</td>
+</tr>
+<tr>
+<td><strong>ai_engine</strong></td>
+<td>NLP structured fields from text</td>
+</tr>
+<tr>
+<td><strong>finance_engine</strong></td>
+<td>Financial transactions from AI</td>
+</tr>
+<tr>
+<td><strong>tax_engine</strong></td>
+<td>Tax computation</td>
+</tr>
+<tr>
+<td><strong>reports</strong></td>
+<td>Tax dashboards + PDF export</td>
+</tr>
+<tr>
+<td><strong>videocalls</strong></td>
+<td>Video call rooms / recordings</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="615" data-line-end="616"><a id="B2_Root_URL_routing_complete_615"></a>B2. Root URL routing (complete)</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Module / purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sw.js</code>, <code>service-worker.js</code></td>
+<td>PWA / offline SW</td>
+</tr>
+<tr>
+<td><code>admin/</code></td>
+<td>Platform admin</td>
+</tr>
+<tr>
+<td>`` (empty)</td>
+<td>Redirect → <code>/dashboard/landing/</code></td>
+</tr>
+<tr>
+<td><code>auth/</code></td>
+<td>Accounts: login, register, profile, security, roles, team</td>
+</tr>
+<tr>
+<td><code>dashboard/</code></td>
+<td>Core dashboard, company profile, bank accounts, summary APIs</td>
+</tr>
+<tr>
+<td><code>api/invoices/</code></td>
+<td>Invoice REST API</td>
+</tr>
+<tr>
+<td><code>api/requisitions/</code></td>
+<td>Requisition REST API</td>
+</tr>
+<tr>
+<td><code>api/core/</code></td>
+<td>Core dashboard/realtime/currency APIs</td>
+</tr>
+<tr>
+<td><code>api/receipts/</code></td>
+<td>Receipts API</td>
+</tr>
+<tr>
+<td><code>api/waybills/</code></td>
+<td>Waybills API</td>
+</tr>
+<tr>
+<td><code>api/job-orders/</code></td>
+<td>Job orders API</td>
+</tr>
+<tr>
+<td><code>quotations/</code></td>
+<td>Quotations web</td>
+</tr>
+<tr>
+<td><code>api/clients/</code></td>
+<td>Clients API</td>
+</tr>
+<tr>
+<td><code>api/mailing/</code></td>
+<td>Mailing API</td>
+</tr>
+<tr>
+<td><code>api/inventory/</code></td>
+<td>Inventory API</td>
+</tr>
+<tr>
+<td><code>api/store/</code></td>
+<td>Store API</td>
+</tr>
+<tr>
+<td><code>api/expense/</code></td>
+<td>Expense API</td>
+</tr>
+<tr>
+<td><code>accounting/api/</code></td>
+<td>Accounting API</td>
+</tr>
+<tr>
+<td><code>invoices/</code></td>
+<td>Invoices web</td>
+</tr>
+<tr>
+<td><code>receipts/</code></td>
+<td>Receipts web</td>
+</tr>
+<tr>
+<td><code>requisitions/</code></td>
+<td>Requisitions web</td>
+</tr>
+<tr>
+<td><code>waybills/</code></td>
+<td>Waybills web</td>
+</tr>
+<tr>
+<td><code>job-orders/</code></td>
+<td>Job orders web</td>
+</tr>
+<tr>
+<td><code>clients/</code></td>
+<td>Clients web</td>
+</tr>
+<tr>
+<td><code>inventory/</code></td>
+<td>Inventory web</td>
+</tr>
+<tr>
+<td><code>store/</code></td>
+<td>Store web</td>
+</tr>
+<tr>
+<td><code>expense/</code></td>
+<td>Expense web</td>
+</tr>
+<tr>
+<td><code>accounting/</code></td>
+<td>Accounting web</td>
+</tr>
+<tr>
+<td><code>messaging/</code></td>
+<td>Messaging web + messaging APIs</td>
+</tr>
+<tr>
+<td><code>mailing/</code></td>
+<td>Mailing web</td>
+</tr>
+<tr>
+<td><code>hr-staff/</code></td>
+<td>HR web</td>
+</tr>
+<tr>
+<td><code>api/hr-staff/</code></td>
+<td>HR API</td>
+</tr>
+<tr>
+<td><code>api/v1/</code></td>
+<td>Sync API</td>
+</tr>
+<tr>
+<td><code>documents/</code></td>
+<td>Documents web</td>
+</tr>
+<tr>
+<td><code>reports/</code></td>
+<td>Tax reports web</td>
+</tr>
+<tr>
+<td><code>api/documents/</code></td>
+<td>Documents API</td>
+</tr>
+<tr>
+<td><code>api/extraction/</code></td>
+<td>Extraction API</td>
+</tr>
+<tr>
+<td><code>api/ai/</code></td>
+<td>AI analyze API</td>
+</tr>
+<tr>
+<td><code>api/finance/</code></td>
+<td>Finance extract API</td>
+</tr>
+<tr>
+<td><code>api/tax/</code></td>
+<td>Tax API</td>
+</tr>
+<tr>
+<td><code>api/reports/</code></td>
+<td>Reports API</td>
+</tr>
+<tr>
+<td><code>payroll/</code></td>
+<td>Payroll web</td>
+</tr>
+<tr>
+<td><code>api/payroll/</code></td>
+<td>Payroll API (+ offline-sync)</td>
+</tr>
+<tr>
+<td><code>notifications/</code></td>
+<td>Notifications web</td>
+</tr>
+<tr>
+<td><code>attendance/</code></td>
+<td>Smart attendance web</td>
+</tr>
+<tr>
+<td><code>api/biometric/push</code>, <code>.../batch</code></td>
+<td>ZKTeco push gateway</td>
+</tr>
+<tr>
+<td><code>api/devices</code>, <code>api/devices/discover</code></td>
+<td>Device list / discovery</td>
+</tr>
+<tr>
+<td><code>api/attendance/*</code></td>
+<td>live, realtime, logs, report, today, employee, device-status, last-punch, push-offline</td>
+</tr>
+<tr>
+<td><code>videocalls/</code></td>
+<td>Video calls web</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="669" data-line-end="670">Media/static served at configured MEDIA/STATIC URLs.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="673" data-line-end="674"><a id="B3_Accounts_module_routing_logic_673"></a>B3. Accounts module — routing &amp; logic</h2>
+<h3 class="code-line has-line-data" data-line-start="675" data-line-end="676"><a id="Auth_675"></a>Auth</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/auth/login/</code></td>
+<td>Login (User or Team Member)</td>
+</tr>
+<tr>
+<td><code>/auth/logout/</code></td>
+<td>Logout; clear team session flag</td>
+</tr>
+<tr>
+<td><code>/auth/register/</code></td>
+<td>Register → Account + default Viewer role</td>
+</tr>
+<tr>
+<td><code>/auth/password_reset/</code> … <code>/auth/reset/complete/</code></td>
+<td>Password reset</td>
+</tr>
+<tr>
+<td><code>/auth/password-change-required/</code></td>
+<td>Forced password change</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="685" data-line-end="686"><a id="Profile_685"></a>Profile</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/auth/profile/</code></td>
+<td>View profile + role names</td>
+</tr>
+<tr>
+<td><code>/auth/profile/edit/</code></td>
+<td>Edit profile</td>
+</tr>
+<tr>
+<td><code>/auth/dashboard/</code></td>
+<td>Accounts dashboard helper</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="693" data-line-end="694"><a id="Security_team_693"></a>Security / team</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Required permission</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/auth/security/</code></td>
+<td>login + security hub perms</td>
+<td>account</td>
+</tr>
+<tr>
+<td><code>/auth/security/team/</code></td>
+<td><code>accounts.view_subuser</code></td>
+<td><code>team_members</code> where owner.account = current</td>
+</tr>
+<tr>
+<td><code>/auth/security/team/add/</code></td>
+<td><code>accounts.add_subuser</code></td>
+<td>role must be same account + assignable</td>
+</tr>
+<tr>
+<td><code>/auth/security/team/&lt;id&gt;/edit/</code></td>
+<td><code>accounts.change_subuser</code></td>
+<td>id + same account</td>
+</tr>
+<tr>
+<td><code>/auth/security/team/&lt;id&gt;/delete/</code></td>
+<td><code>accounts.delete_subuser</code></td>
+<td>same; cannot delete owner</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="703" data-line-end="704"><a id="Security_roles_703"></a>Security / roles</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Required permission</th>
+<th>Isolation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/auth/security/roles/</code></td>
+<td><code>auth.view_group</code> (or <code>roles.view</code>)</td>
+<td>roles for current account only</td>
+</tr>
+<tr>
+<td><code>/auth/security/roles/add/</code></td>
+<td><code>auth.add_group</code></td>
+<td>create under current account</td>
+</tr>
+<tr>
+<td><code>/auth/security/roles/&lt;id&gt;/edit/</code></td>
+<td><code>auth.change_group</code></td>
+<td>id + account</td>
+</tr>
+<tr>
+<td><code>/auth/security/roles/&lt;id&gt;/delete/</code></td>
+<td><code>auth.delete_group</code></td>
+<td>remove members then delete</td>
+</tr>
+<tr>
+<td><code>/auth/security/roles/&lt;id&gt;/members/</code></td>
+<td><code>auth.change_group</code></td>
+<td>members limited to owner + active team linked users</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="713" data-line-end="714"><a id="Security_sessions_activity_713"></a>Security / sessions &amp; activity</h3>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/auth/security/sessions/</code></td>
+<td>Session history (account-scoped)</td>
+</tr>
+<tr>
+<td><code>/auth/security/session/&lt;uuid&gt;/</code></td>
+<td>Detail</td>
+</tr>
+<tr>
+<td><code>/auth/security/session/&lt;uuid&gt;/terminate/</code></td>
+<td>Terminate one</td>
+</tr>
+<tr>
+<td><code>/auth/security/sessions/terminate-all/</code></td>
+<td>Terminate all</td>
+</tr>
+<tr>
+<td><code>/auth/security/activities/</code></td>
+<td>Activity log (<code>view_activity_log</code> / <code>view_useractivity</code>)</td>
+</tr>
+<tr>
+<td><code>/auth/security/activity/&lt;uuid&gt;/</code></td>
+<td>Detail with changes / deleted_data</td>
+</tr>
+<tr>
+<td><code>/auth/security/admin/</code></td>
+<td>Platform staff overview</td>
+</tr>
+<tr>
+<td><code>/auth/security/admin/user/&lt;id&gt;/</code></td>
+<td>Per-user activities</td>
+</tr>
+<tr>
+<td><code>/auth/security/admin/live-users/</code></td>
+<td>Live users</td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="727" data-line-end="728"><a id="Account_resolution_helper_all_security_views_727"></a>Account resolution helper (all security views)</h3>
+<pre><code class="has-line-data language-pseudo" data-line-start="730" data-line-end="734">get_request_account(request):
+  if request.company?.account_id: return request.company.account
+  return request.user.account
+</code></pre>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="737" data-line-end="738"><a id="B4_Core_dashboard_routing_737"></a>B4. Core / dashboard — routing</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/dashboard/</code></td>
+<td>Main dashboard</td>
+</tr>
+<tr>
+<td><code>/dashboard/landing/</code></td>
+<td>Landing</td>
+</tr>
+<tr>
+<td><code>/dashboard/company-profile/</code></td>
+<td>View/edit company (perms: view/change companyprofile)</td>
+</tr>
+<tr>
+<td><code>/dashboard/bank-accounts/</code></td>
+<td>List bank accounts</td>
+</tr>
+<tr>
+<td><code>/dashboard/bank-accounts/&lt;pk&gt;/edit/</code></td>
+<td>Edit</td>
+</tr>
+<tr>
+<td><code>/dashboard/bank-accounts/&lt;pk&gt;/delete/</code></td>
+<td>Delete</td>
+</tr>
+<tr>
+<td><code>/dashboard/bank-accounts/&lt;pk&gt;/set-default/</code></td>
+<td>Set default</td>
+</tr>
+<tr>
+<td><code>/dashboard/update-currency/</code></td>
+<td>Update currency</td>
+</tr>
+<tr>
+<td><code>/dashboard/api/dashboard/stats|charts|actions|tips/</code></td>
+<td>Dashboard widgets</td>
+</tr>
+<tr>
+<td><code>/dashboard/api/core/num2words/</code></td>
+<td>Number to words</td>
+</tr>
+<tr>
+<td><code>/dashboard/api/summaries/dashboard|invoices|receipts|quotations|job-orders|waybills/</code></td>
+<td><strong>Must use tenant+visibility filter</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 class="code-line has-line-data" data-line-start="753" data-line-end="754"><a id="API_apicore_753"></a>API <code>/api/core/</code></h3>
+<ul>
+<li class="has-line-data" data-line-start="755" data-line-end="756"><code>num2words/</code>, <code>my-ip/</code></li>
+<li class="has-line-data" data-line-start="756" data-line-end="757"><code>dashboard/stats|charts|actions|tips/</code></li>
+<li class="has-line-data" data-line-start="757" data-line-end="758"><code>dashboard/realtime|notifications|activity|inventory-alerts|system-health/</code></li>
+<li class="has-line-data" data-line-start="758" data-line-end="760"><code>update-currency/</code>, <code>currency-status/</code></li>
+</ul>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="762" data-line-end="763"><a id="B5_Business_modules_routing_permissions_isolation_762"></a>B5. Business modules — routing, permissions, isolation</h2>
+<h3 class="code-line has-line-data" data-line-start="764" data-line-end="765"><a id="B51_Invoices_764"></a>B5.1 Invoices</h3>
+<p class="has-line-data" data-line-start="766" data-line-end="767"><strong>Web:</strong> <code>/invoices/</code> list; <code>create/</code>, <code>create/dynamic/</code>; <code>&lt;pk&gt;/</code>, <code>edit/</code>, <code>delete/</code>, <code>delete-ajax/</code>; <code>pdf/</code>, <code>print/</code>; <code>export/excel|pdf/</code>; <code>templates/</code> CRUD + duplicate + apply-to-all; <code>api/templates/</code>, <code>&lt;pk&gt;/update-status/</code>, <code>toggle-payment/</code>.</p>
+<p class="has-line-data" data-line-start="768" data-line-end="769"><strong>API:</strong> <code>api/invoices/</code> — list/create/retrieve/update/destroy; tenant+visibility.</p>
+<p class="has-line-data" data-line-start="770" data-line-end="771"><strong>Model keys:</strong> <code>account_id</code>, <code>created_by_id</code> (+ template, client fields, status, bank/signature flags).</p>
+<p class="has-line-data" data-line-start="772" data-line-end="773"><strong>Permissions:</strong> <code>invoices.view|add|change|delete_invoice</code>, <code>print_invoice</code>, <code>download_invoice</code>, <code>can_approve_invoice</code>; template CRUD. Use <code>admin_OR_perm</code> for change/delete/print/download/approve.</p>
+<p class="has-line-data" data-line-start="774" data-line-end="775"><strong>Isolation:</strong> <code>account_lookup = account</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="778" data-line-end="779"><a id="B52_Receipts_778"></a>B5.2 Receipts</h3>
+<p class="has-line-data" data-line-start="780" data-line-end="781"><strong>Web:</strong> <code>/receipts/</code> list; <code>create/</code>, <code>create/&lt;invoice_id&gt;/</code>; <code>&lt;id&gt;/</code> detail/edit/delete/print/pdf/email; export excel/pdf.</p>
+<p class="has-line-data" data-line-start="782" data-line-end="783"><strong>API:</strong> <code>api/receipts/</code>.</p>
+<p class="has-line-data" data-line-start="784" data-line-end="785"><strong>Keys:</strong> <code>account_id</code>, <code>created_by_id</code>, link to invoice.</p>
+<p class="has-line-data" data-line-start="786" data-line-end="787"><strong>Permissions:</strong> <code>receipts.view|add|change|delete_receipt</code>, <code>print_receipt</code>, <code>download_receipt</code>; admin_OR_perm for mutations/print/download.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="790" data-line-end="791"><a id="B53_Requisitions_790"></a>B5.3 Requisitions</h3>
+<p class="has-line-data" data-line-start="792" data-line-end="793"><strong>Web:</strong> <code>/requisitions/</code> list; <code>modal/</code>; <code>create/</code>; <code>&lt;pk&gt;/</code> detail/edit/delete/print/pdf/<code>update-status/</code>.</p>
+<p class="has-line-data" data-line-start="794" data-line-end="795"><strong>API:</strong> <code>api/requisitions/</code>.</p>
+<p class="has-line-data" data-line-start="796" data-line-end="797"><strong>Keys:</strong> <code>account_id</code>, <code>created_by_id</code>, <code>approved_by</code>, <code>company_id</code>, workflow status.</p>
+<p class="has-line-data" data-line-start="798" data-line-end="799"><strong>Permissions:</strong> view/add/change/delete/print/download + <code>can_approve_requisition</code> for status approve/reject.</p>
+<p class="has-line-data" data-line-start="800" data-line-end="801"><strong>Isolation:</strong> <code>account</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="804" data-line-end="805"><a id="B54_Waybills_804"></a>B5.4 Waybills</h3>
+<p class="has-line-data" data-line-start="806" data-line-end="807"><strong>Web:</strong> <code>/waybills/</code> list; multiple create variants; <code>&lt;pk&gt;/</code> CRUD/print/<code>update-status/</code>; exports; templates CRUD; APIs for template fields, form-content, preview, company-profile.</p>
+<p class="has-line-data" data-line-start="808" data-line-end="809"><strong>Keys:</strong> <code>account_id</code>, <code>created_by_id</code>, optional <code>company_id</code>.</p>
+<p class="has-line-data" data-line-start="810" data-line-end="811"><strong>Permissions:</strong> waybill CRUD + print/download + <code>can_approve_waybill</code>; template CRUD.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="814" data-line-end="815"><a id="B55_Job_orders_814"></a>B5.5 Job orders</h3>
+<p class="has-line-data" data-line-start="816" data-line-end="817"><strong>Web:</strong> <code>/job-orders/</code> products list; create; <code>&lt;pk&gt;/</code> detail/print/edit/delete; product-view; approve; update-delivery; production status; exports; customers/stores/orders/leaves CRUD; update-currency.</p>
+<p class="has-line-data" data-line-start="818" data-line-end="819"><strong>Keys:</strong> Product <code>account_id</code>, <code>created_by_id</code>.</p>
+<p class="has-line-data" data-line-start="820" data-line-end="821"><strong>Permissions:</strong> product/order CRUD; templates; <code>print_product</code>, <code>download_product</code>, <code>can_approve_jobs</code>, <code>can_view_all_jobs</code>, <code>can_manage_production</code>, <code>view_dashboard</code>, leave perms, export perms.</p>
+<p class="has-line-data" data-line-start="822" data-line-end="823"><strong>Isolation:</strong> <code>account</code> on Product (and related).</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="826" data-line-end="827"><a id="B56_Quotations_826"></a>B5.6 Quotations</h3>
+<p class="has-line-data" data-line-start="828" data-line-end="829"><strong>Web:</strong> <code>/quotations/</code> full CRUD; duplicate/preview; pdf/print; exports; update-status; send-email; convert-to-invoice (also needs <code>invoices.add_invoice</code>); bulk-actions; ajax line items/totals/draft; templates.</p>
+<p class="has-line-data" data-line-start="830" data-line-end="831"><strong>Keys:</strong> <code>account_id</code>, <code>created_by_id</code>, <code>company_id</code>.</p>
+<p class="has-line-data" data-line-start="832" data-line-end="833"><strong>Permissions:</strong> quotation CRUD + print/download (+ approve if used); template CRUD.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="836" data-line-end="837"><a id="B57_Inventory_836"></a>B5.7 Inventory</h3>
+<p class="has-line-data" data-line-start="838" data-line-end="839"><strong>Web:</strong> <code>/inventory/</code> list; list print/pdf; dashboard; create/update/delete/detail/print/pdf; ajax field/status; dashboard-stats.</p>
+<p class="has-line-data" data-line-start="840" data-line-end="841"><strong>API:</strong> <code>api/inventory/</code>.</p>
+<p class="has-line-data" data-line-start="842" data-line-end="843"><strong>Keys:</strong> <code>account_id</code>, <code>company_id</code>, <code>created_by_id</code>.</p>
+<p class="has-line-data" data-line-start="844" data-line-end="845"><strong>Permissions:</strong> inventory CRUD + print/download + <code>can_approve_inventory</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="848" data-line-end="849"><a id="B58_Expense_848"></a>B5.8 Expense</h3>
+<p class="has-line-data" data-line-start="850" data-line-end="851"><strong>Web:</strong> <code>/expense/</code> (same pattern as inventory).</p>
+<p class="has-line-data" data-line-start="852" data-line-end="853"><strong>API:</strong> <code>api/expense/</code>.</p>
+<p class="has-line-data" data-line-start="854" data-line-end="855"><strong>Keys:</strong> <code>account_id</code>, <code>company_id</code>, <code>created_by_id</code>.</p>
+<p class="has-line-data" data-line-start="856" data-line-end="857"><strong>Permissions:</strong> expense CRUD + print/download + <code>can_approve_expense</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="860" data-line-end="861"><a id="B59_Clients_860"></a>B5.9 Clients</h3>
+<p class="has-line-data" data-line-start="862" data-line-end="863"><strong>Web:</strong> <code>/clients/</code> list/create/<code>&lt;pk&gt;/</code> detail/edit/delete.</p>
+<p class="has-line-data" data-line-start="864" data-line-end="865"><strong>API:</strong> <code>api/clients/&lt;id&gt;/</code>.</p>
+<p class="has-line-data" data-line-start="866" data-line-end="867"><strong>Keys:</strong> <code>company_id</code>, <code>created_by_id</code>.</p>
+<p class="has-line-data" data-line-start="868" data-line-end="869"><strong>Permissions:</strong> <code>clients.view|add|change|delete_client</code>.</p>
+<p class="has-line-data" data-line-start="870" data-line-end="871"><strong>Isolation:</strong> <code>company → account</code> (<code>company__account</code>).</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="874" data-line-end="875"><a id="B510_Accounting_874"></a>B5.10 Accounting</h3>
+<p class="has-line-data" data-line-start="876" data-line-end="877"><strong>Web:</strong> <code>/accounting/</code> dashboard; transactions list/add/<code>&lt;uuid&gt;/</code> edit/delete/reconcile/unreconcile; update_currencies; export; reports generate/detail/export-pdf; sync; ajax ledger/currency.</p>
+<p class="has-line-data" data-line-start="878" data-line-end="879"><strong>Keys:</strong> Transaction <code>company_id</code>, <code>created_by_id</code>.</p>
+<p class="has-line-data" data-line-start="880" data-line-end="881"><strong>Permissions:</strong> transaction CRUD; ledger view; chart/account CRUD; financial report CRUD.</p>
+<p class="has-line-data" data-line-start="882" data-line-end="883"><strong>Isolation:</strong> <code>company__account</code>.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="886" data-line-end="887"><a id="B511_Messaging_886"></a>B5.11 Messaging</h3>
+<p class="has-line-data" data-line-start="888" data-line-end="889"><strong>Web:</strong> <code>/messaging/</code> inbox; <code>/messaging/conversation/&lt;id&gt;/</code> chat.</p>
+<p class="has-line-data" data-line-start="890" data-line-end="891"><strong>API (under <code>/messaging/api/</code>):</strong> csrf; account-users; conversations CRUD; messages list/send/upload/delete/mark-read; call start/status/end; members add/remove; leave/rejoin; rename; typing; presence; message-file.</p>
+<p class="has-line-data" data-line-start="892" data-line-end="893"><strong>Keys:</strong> Conversation <code>account_id</code>, <code>created_by_id</code>; membership by user within account.</p>
+<p class="has-line-data" data-line-start="894" data-line-end="895"><strong>Permissions:</strong> conversation/message/etc. view/add/change/delete; nav: <code>messaging.view_conversation</code>.</p>
+<p class="has-line-data" data-line-start="896" data-line-end="897"><strong>Isolation:</strong> account-scoped conversations; only members see messages.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="900" data-line-end="901"><a id="B512_Documents_AI_tax_reports_900"></a>B5.12 Documents / AI / tax / reports</h3>
+<p class="has-line-data" data-line-start="902" data-line-end="903"><strong>Web:</strong> <code>/documents/</code> list/upload/<code>&lt;pk&gt;/</code> detail/delete/reprocess/status/processing-status; <code>/reports/dashboard|monthly|quarterly|annual/</code>; <code>/reports/export/pdf/</code>.</p>
+<p class="has-line-data" data-line-start="904" data-line-end="905"><strong>API:</strong></p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/documents/upload/</code></td>
+<td>Upload + run pipeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/documents/&lt;id&gt;/status/</code></td>
+<td>Processing status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/extraction/run/</code></td>
+<td>OCR/PDF only</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/analyze/</code></td>
+<td>Structured fields</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/finance/extract/</code></td>
+<td>Create financial txs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/tax/compute/</code>, <code>/api/tax/list/</code></td>
+<td>Tax records</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/dashboard/</code></td>
+<td>Period totals JSON</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="916" data-line-end="917"><strong>Pipeline:</strong> extraction → AI → finance transactions → tax compute (monthly) → store preview + JSON on document.</p>
+<p class="has-line-data" data-line-start="918" data-line-end="919"><strong>Tax formulas:</strong> profit = revenue − expenses; corporate_tax = profit × 0.30; vat_payable = output_vat − input_vat.</p>
+<p class="has-line-data" data-line-start="920" data-line-end="921"><strong>Keys:</strong> all <code>company_id</code>; access via <code>request.company</code>.</p>
+<p class="has-line-data" data-line-start="922" data-line-end="923"><strong>Permissions:</strong> documents CRUD; <code>documents.view_tax_report</code> for reports/tax APIs; admin_OR_perm.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="926" data-line-end="927"><a id="B513_Mailing_926"></a>B5.13 Mailing</h3>
+<p class="has-line-data" data-line-start="928" data-line-end="929"><strong>Web/API:</strong> <code>/mailing/</code>, <code>api/mailing/</code>. Company-scoped From address + logo from Company Profile.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="932" data-line-end="933"><a id="B514_HR_Staff_932"></a>B5.14 HR Staff</h3>
+<p class="has-line-data" data-line-start="934" data-line-end="935"><strong>Web/API:</strong> <code>/hr-staff/</code>, <code>api/hr-staff/</code>. Company-scoped employees/departments/leave/etc.</p>
+<p class="has-line-data" data-line-start="936" data-line-end="937"><strong>Nav perms include:</strong> <code>hr_staff.view_hr_dashboard</code>, <code>view_own_hr_dashboard</code>, department/employee/leave/… view perms.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="940" data-line-end="941"><a id="B515_Payroll_940"></a>B5.15 Payroll</h3>
+<p class="has-line-data" data-line-start="942" data-line-end="943"><strong>Web/API:</strong> <code>/payroll/</code>, <code>api/payroll/</code>, <code>api/payroll/offline-sync</code>. Tenant-scoped payroll records.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="946" data-line-end="947"><a id="B516_Notifications_946"></a>B5.16 Notifications</h3>
+<p class="has-line-data" data-line-start="948" data-line-end="949"><strong>Web:</strong> <code>/notifications/</code>. In-app notifications (user/account scoped).</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="952" data-line-end="953"><a id="B517_Sync_API_952"></a>B5.17 Sync API</h3>
+<p class="has-line-data" data-line-start="954" data-line-end="955"><strong>Path:</strong> <code>/api/v1/</code>. Offline-first sync; must still enforce auth + tenant on every resource.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="958" data-line-end="959"><a id="B518_Smart_attendance_958"></a>B5.18 Smart attendance</h3>
+<p class="has-line-data" data-line-start="960" data-line-end="961"><strong>Web:</strong> <code>/attendance/</code> dashboard; <code>/attendance/devices/</code>; <code>/attendance/devices/register/</code>.</p>
+<p class="has-line-data" data-line-start="962" data-line-end="963"><strong>API:</strong> biometric push (+ batch); devices; attendance live/realtime/logs/report/today/employee/device-status/last-punch/push-offline.</p>
+<p class="has-line-data" data-line-start="964" data-line-end="965"><strong>Isolation:</strong> devices and logs company/account-scoped; push verifies device secret.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="968" data-line-end="969"><a id="B519_Video_calls_968"></a>B5.19 Video calls</h3>
+<p class="has-line-data" data-line-start="970" data-line-end="971"><strong>Web:</strong> <code>/videocalls/</code>. Rooms, invitations, recordings; permission-gated; account-aware.</p>
+<hr>
+<h3 class="code-line has-line-data" data-line-start="974" data-line-end="975"><a id="B520_Store_974"></a>B5.20 Store</h3>
+<p class="has-line-data" data-line-start="976" data-line-end="977"><strong>Web/API:</strong> <code>/store/</code>, <code>api/store/</code>. Store entities company/account-scoped; Company Admin sync includes store permissions.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="980" data-line-end="981"><a id="B6_APIs_quick_reference_980"></a>B6. APIs quick reference</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api/invoices/</code></td>
+<td>Invoice resource CRUD</td>
+</tr>
+<tr>
+<td><code>api/requisitions/</code></td>
+<td>Requisition resource CRUD</td>
+</tr>
+<tr>
+<td><code>api/receipts/</code>, <code>api/waybills/</code>, <code>api/job-orders/</code></td>
+<td>Domain APIs</td>
+</tr>
+<tr>
+<td><code>api/core/</code></td>
+<td>Dashboard, realtime, currency, health</td>
+</tr>
+<tr>
+<td><code>api/clients/&lt;id&gt;/</code></td>
+<td>Client detail</td>
+</tr>
+<tr>
+<td><code>api/inventory/</code>, <code>api/store/</code>, <code>api/expense/</code></td>
+<td>Inventory/store/expense</td>
+</tr>
+<tr>
+<td><code>accounting/api/</code></td>
+<td>Accounting API</td>
+</tr>
+<tr>
+<td><code>dashboard/api/...</code></td>
+<td>Stats, charts, summaries (tenant+visibility)</td>
+</tr>
+<tr>
+<td><code>messaging/api/...</code></td>
+<td>Chat, presence, calls</td>
+</tr>
+<tr>
+<td><code>api/mailing/</code></td>
+<td>Campaigns</td>
+</tr>
+<tr>
+<td><code>api/documents/</code>, <code>api/extraction/</code>, <code>api/ai/</code>, <code>api/finance/</code>, <code>api/tax/</code>, <code>api/reports/</code></td>
+<td>AI tax analyzer</td>
+</tr>
+<tr>
+<td><code>api/hr-staff/</code>, <code>api/payroll/</code></td>
+<td>HR / payroll</td>
+</tr>
+<tr>
+<td><code>api/v1/</code></td>
+<td>Offline sync</td>
+</tr>
+<tr>
+<td><code>api/biometric/*</code>, <code>api/devices*</code>, <code>api/attendance/*</code></td>
+<td>Attendance</td>
+</tr>
+<tr>
+<td><code>videocalls/</code></td>
+<td>Video</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="1000" data-line-end="1001"><strong>All authenticated APIs:</strong> apply tenant + visibility (or membership) filters. Never trust client-supplied <code>account_id</code>.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1004" data-line-end="1005"><a id="B7_Feature_navigation_permissions_1004"></a>B7. Feature → navigation permissions</h2>
+<p class="has-line-data" data-line-start="1006" data-line-end="1007">Nav item visible only if user has <strong>any</strong> of the mapped view permissions (and Account has full access where gated).</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Nav key</th>
+<th>Example required permissions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>clients</td>
+<td><code>clients.view_client</code></td>
+</tr>
+<tr>
+<td>invoices</td>
+<td><code>invoices.view_invoice</code></td>
+</tr>
+<tr>
+<td>quotations</td>
+<td><code>quotations.view_quotation</code></td>
+</tr>
+<tr>
+<td>receipts</td>
+<td><code>receipts.view_receipt</code></td>
+</tr>
+<tr>
+<td>job_orders</td>
+<td><code>job_orders.view_product</code> / <code>view_order</code></td>
+</tr>
+<tr>
+<td>waybills</td>
+<td><code>waybills.view_waybill</code></td>
+</tr>
+<tr>
+<td>requisitions</td>
+<td><code>requisitions.view_requisition</code></td>
+</tr>
+<tr>
+<td>inventory</td>
+<td><code>inventory.view_inventory</code></td>
+</tr>
+<tr>
+<td>expense</td>
+<td><code>expense.view_expense</code></td>
+</tr>
+<tr>
+<td>accounting</td>
+<td><code>accounting.view_transaction</code> (and related)</td>
+</tr>
+<tr>
+<td>messaging</td>
+<td><code>messaging.view_conversation</code></td>
+</tr>
+<tr>
+<td>mailing</td>
+<td>mailing use/view perms</td>
+</tr>
+<tr>
+<td>team_and_roles</td>
+<td><code>accounts.view_subuser</code> OR <code>accounts.view_accountgroup</code></td>
+</tr>
+<tr>
+<td>company_profile</td>
+<td><code>core.view_companyprofile</code> OR <code>change_companyprofile</code></td>
+</tr>
+<tr>
+<td>activity</td>
+<td><code>accounts.view_useractivity</code> OR <code>view_activity_log</code></td>
+</tr>
+<tr>
+<td>hr_staff</td>
+<td><code>hr_staff.view_hr_dashboard</code> OR <code>view_own_hr_dashboard</code></td>
+</tr>
+<tr>
+<td>smart_attendance</td>
+<td><code>smart_attendance.view_attendance_dashboard</code></td>
+</tr>
+<tr>
+<td>payroll</td>
+<td><code>payroll.view_payrollrecord</code> / <code>view_payroll</code></td>
+</tr>
+<tr>
+<td>documents</td>
+<td><code>documents.view_document</code></td>
+</tr>
+<tr>
+<td>notifications</td>
+<td><code>notifications.view_notification</code></td>
+</tr>
+<tr>
+<td>reports</td>
+<td><code>reports.view_tax_report</code> OR <code>documents.view_tax_report</code></td>
+</tr>
+<tr>
+<td>dashboard</td>
+<td><code>core.view_dashboard</code></td>
+</tr>
+<tr>
+<td>video_calls / recordings</td>
+<td>videocalls view perms</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="1034" data-line-end="1035"><code>ELEVATED_PERMISSIONS</code> = union of the above business nav perms (used for full-access unlock).</p>
+<p class="has-line-data" data-line-start="1036" data-line-end="1037">UI context flags to expose globally: <code>user_can_manage_users</code>, <code>user_can_access_company_profile</code>, <code>is_company_admin</code>, <code>is_read_only_user</code>, <code>show_created_by</code>, <code>show_request_full_access_cta</code>, <code>show_approved_assign_role_notice</code>, company theme/currency.</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1040" data-line-end="1041"><a id="B8_Permissions_catalog_by_module_1040"></a>B8. Permissions catalog (by module)</h2>
+<p class="has-line-data" data-line-start="1042" data-line-end="1043">Format: <code>module.codename</code>. Labels are display-only.</p>
+<ul>
+<li class="has-line-data" data-line-start="1044" data-line-end="1045"><strong>Job orders:</strong> view/add/change/delete product &amp; order; jobordertemplate CRUD; print/download product; <code>can_approve_jobs</code>, <code>can_view_all_jobs</code>, <code>can_export_*</code>, <code>can_manage_production</code>, <code>view_dashboard</code>, leave manage/export; customer/employeeprofile as used</li>
+<li class="has-line-data" data-line-start="1045" data-line-end="1046"><strong>Invoices:</strong> invoice CRUD; print/download; <code>can_approve_invoice</code>; invoicetemplate CRUD</li>
+<li class="has-line-data" data-line-start="1046" data-line-end="1047"><strong>Receipts:</strong> receipt CRUD; print/download</li>
+<li class="has-line-data" data-line-start="1047" data-line-end="1048"><strong>Quotations:</strong> quotation CRUD; print/download; (<code>can_approve_quotation</code> if used); template CRUD</li>
+<li class="has-line-data" data-line-start="1048" data-line-end="1049"><strong>Waybills:</strong> waybill CRUD; print/download; <code>can_approve_waybill</code>; template CRUD</li>
+<li class="has-line-data" data-line-start="1049" data-line-end="1050"><strong>Requisitions:</strong> requisition CRUD; print/download; <code>can_approve_requisition</code></li>
+<li class="has-line-data" data-line-start="1050" data-line-end="1051"><strong>Inventory:</strong> inventory CRUD; print/download; <code>can_approve_inventory</code></li>
+<li class="has-line-data" data-line-start="1051" data-line-end="1052"><strong>Expense:</strong> expense CRUD; print/download; <code>can_approve_expense</code></li>
+<li class="has-line-data" data-line-start="1052" data-line-end="1053"><strong>Clients:</strong> client CRUD</li>
+<li class="has-line-data" data-line-start="1053" data-line-end="1054"><strong>Messaging:</strong> conversation, conversationmember, message, messagehiddenforuser, callsession, userpresence, typingindicator CRUD as applicable</li>
+<li class="has-line-data" data-line-start="1054" data-line-end="1055"><strong>Accounting:</strong> transaction CRUD; view_ledger; account CRUD; financialreport CRUD</li>
+<li class="has-line-data" data-line-start="1055" data-line-end="1056"><strong>Core:</strong> companyprofile CRUD; bankaccount CRUD; view_dashboard</li>
+<li class="has-line-data" data-line-start="1056" data-line-end="1057"><strong>Accounts:</strong> user CRUD; subuser (team) CRUD; accountgroup (role) CRUD; usersession view/change; useractivity / <code>view_activity_log</code></li>
+<li class="has-line-data" data-line-start="1057" data-line-end="1058"><strong>Auth/meta:</strong> group/permission management — <strong>non-delegatable</strong> in tenant role UI</li>
+<li class="has-line-data" data-line-start="1058" data-line-end="1059"><strong>Documents:</strong> document CRUD; <code>view_tax_report</code></li>
+<li class="has-line-data" data-line-start="1059" data-line-end="1061"><strong>HR / payroll / attendance / mailing / videocalls / notifications / store / finance_engine:</strong> module view/add/change/delete + custom dashboard/approve perms as registered in the permission catalog</li>
+</ul>
+<p class="has-line-data" data-line-start="1061" data-line-end="1062">Human-readable labels and module order for Role UI belong in a single permission-labels map (do not change stored codes).</p>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1065" data-line-end="1066"><a id="B9_UI_screens_logical_any_frontend_1065"></a>B9. UI screens (logical; any frontend)</h2>
+<p class="has-line-data" data-line-start="1067" data-line-end="1068">Implement equivalent screens (SPA, server templates, mobile):</p>
+<ul>
+<li class="has-line-data" data-line-start="1069" data-line-end="1070">Auth: login, register, password reset/confirm/complete, forced password change</li>
+<li class="has-line-data" data-line-start="1070" data-line-end="1071">Profile view/edit</li>
+<li class="has-line-data" data-line-start="1071" data-line-end="1072">Security hub; team list/form; role list/form/members; sessions; activity list/detail</li>
+<li class="has-line-data" data-line-start="1072" data-line-end="1073">Dashboard / landing; company profile; bank accounts</li>
+<li class="has-line-data" data-line-start="1073" data-line-end="1074">Per module: list, detail, create/edit form, confirm delete, print, PDF/export, dashboards where listed</li>
+<li class="has-line-data" data-line-start="1074" data-line-end="1075">Messaging inbox/chat</li>
+<li class="has-line-data" data-line-start="1075" data-line-end="1076">Documents list/upload/detail/processing; tax reports</li>
+<li class="has-line-data" data-line-start="1076" data-line-end="1077">Attendance dashboard/devices/register</li>
+<li class="has-line-data" data-line-start="1077" data-line-end="1079">Base layout with permission-gated side nav</li>
+</ul>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1081" data-line-end="1082"><a id="B10_RBAC_summary_short_1081"></a>B10. RBAC summary (short)</h2>
+<ol>
+<li class="has-line-data" data-line-start="1083" data-line-end="1084">Authorize with permission codes only.</li>
+<li class="has-line-data" data-line-start="1084" data-line-end="1085">Map features → permissions for nav and guards.</li>
+<li class="has-line-data" data-line-start="1085" data-line-end="1086">Company admin (owner, not acting as team member) may bypass via <code>admin_OR_permission</code>.</li>
+<li class="has-line-data" data-line-start="1086" data-line-end="1087"><code>full_company_visibility</code> = see all tenant rows; mutation still needs add/change/delete.</li>
+<li class="has-line-data" data-line-start="1087" data-line-end="1088">Delegation: assign only perms you have; block meta escalation perms.</li>
+<li class="has-line-data" data-line-start="1088" data-line-end="1089">Clear permission caches after role changes.</li>
+<li class="has-line-data" data-line-start="1089" data-line-end="1091">Keep Company Admin synced when new permissions appear.</li>
+</ol>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1093" data-line-end="1094"><a id="B11_Data_isolation_summary_short_1093"></a>B11. Data isolation summary (short)</h2>
+<ol>
+<li class="has-line-data" data-line-start="1095" data-line-end="1096">Every business row belongs to an Account (directly or via Company).</li>
+<li class="has-line-data" data-line-start="1096" data-line-end="1097">Company admin sees all tenant rows.</li>
+<li class="has-line-data" data-line-start="1097" data-line-end="1098">Team members see own <code>created_by</code> rows unless <code>full_company_visibility</code>.</li>
+<li class="has-line-data" data-line-start="1098" data-line-end="1099">Central filter on lists, get-by-id, reports, exports, APIs, admin.</li>
+<li class="has-line-data" data-line-start="1099" data-line-end="1100"><code>account</code> vs <code>company→account</code> lookup depending on model.</li>
+<li class="has-line-data" data-line-start="1100" data-line-end="1102">Safe default: no <code>created_by</code> field → non-admin sees nothing.</li>
+</ol>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1104" data-line-end="1105"><a id="B12_Antileak_production_test_plan_1104"></a>B12. Anti-leak / production test plan</h2>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Test</th>
+<th>Expect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User A lists invoices</td>
+<td>Only Account A</td>
+</tr>
+<tr>
+<td>User A GET invoice id from B</td>
+<td>404/403</td>
+</tr>
+<tr>
+<td>Team member without full visibility</td>
+<td>Only own created rows</td>
+</tr>
+<tr>
+<td>Team member with full visibility + view-only</td>
+<td>Sees all; POST create → 403</td>
+</tr>
+<tr>
+<td>Assign role from Account B to User A</td>
+<td>Rejected</td>
+</tr>
+<tr>
+<td>Create role “Admin” on A and B</td>
+<td>Two distinct roles; no shared membership</td>
+</tr>
+<tr>
+<td>Unapproved account hits <code>/invoices/</code></td>
+<td>403</td>
+</tr>
+<tr>
+<td>After approve</td>
+<td>Owner has Company Admin; business routes work</td>
+</tr>
+<tr>
+<td>Delete team member</td>
+<td>Linked user roles cleared; cannot login as team</td>
+</tr>
+<tr>
+<td>Report/export endpoints</td>
+<td>Same filters as list</td>
+</tr>
+<tr>
+<td>Messaging</td>
+<td>Cannot open other account’s conversation id</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 class="code-line has-line-data" data-line-start="1122" data-line-end="1123"><a id="B13_Reference_mapping_this_repository_only_1122"></a>B13. Reference mapping (this repository only)</h2>
+<p class="has-line-data" data-line-start="1124" data-line-end="1125">If you are reading this while working <strong>inside this Django codebase</strong>, the concepts map as:</p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Generic</th>
+<th>This repo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Account</td>
+<td><code>core.Account</code></td>
+</tr>
+<tr>
+<td>Company Profile</td>
+<td><code>core.CompanyProfile</code></td>
+</tr>
+<tr>
+<td>User</td>
+<td><code>accounts.User</code></td>
+</tr>
+<tr>
+<td>Team Member</td>
+<td><code>accounts.SubUser</code></td>
+</tr>
+<tr>
+<td>Role</td>
+<td><code>accounts.AccountGroup</code> + <code>auth.Group</code></td>
+</tr>
+<tr>
+<td>Isolation SSOT</td>
+<td><code>apps.core.ownership</code></td>
+</tr>
+<tr>
+<td>Company middleware</td>
+<td><code>CompanyContextMiddleware</code></td>
+</tr>
+<tr>
+<td>Approval middleware</td>
+<td><code>AccountApprovalMiddleware</code></td>
+</tr>
+<tr>
+<td>Permission labels</td>
+<td><code>apps.accounts.permission_labels</code></td>
+</tr>
+<tr>
+<td>Feature/nav map</td>
+<td><code>apps.core.feature_permissions</code></td>
+</tr>
+<tr>
+<td>Role services</td>
+<td><code>apps.accounts.services</code></td>
+</tr>
+<tr>
+<td>Boundaries</td>
+<td><code>apps.accounts.permission_boundaries</code></td>
+</tr>
+<tr>
+<td>Default roles</td>
+<td><code>apps.accounts.default_role</code></td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="1142" data-line-end="1143">You can delete or ignore this section when using the document as a <strong>pure</strong> cross-stack blueprint.</p>
+<hr>
+<h1 class="code-line has-line-data" data-line-start="1146" data-line-end="1147"><a id="End_1146"></a>End</h1>
+<p class="has-line-data" data-line-start="1148" data-line-end="1149">This document lists the multi-tenant model, RBAC, isolation algorithms, conditions, lifecycle, middleware, full routing, module inventory, APIs, permission catalog, UI surfaces, porting guidance, and test plan from beginning to end so the same system can be rebuilt on any programming stack without skipping a layer.</p>
+
+</body>
+</html>

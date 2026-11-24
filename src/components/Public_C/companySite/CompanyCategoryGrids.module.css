@@ -1,0 +1,29 @@
+/*
+ * PublicCategoryPage.layout. Cards never shrink below 16rem, so a frame narrower
+ * than one card scrolls horizontally instead of squashing it.
+ * auto  — one card in a narrow frame, a wrapping grid in a wide one.
+ * stack — always one column.
+ * grid  — always at least two columns (scrolls sideways in a narrow frame).
+ */
+.cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.auto {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.stack {
+  grid-template-columns: minmax(16rem, 1fr);
+}
+
+.grid {
+  grid-template-columns: repeat(2, minmax(16rem, 1fr));
+}
+
+@media (min-width: 52rem) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
+}

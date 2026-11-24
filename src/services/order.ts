@@ -1,0 +1,675 @@
+import { api, unwrap, type MaybeWrapped, type Json, ApiError } from "@/utils/api";
+import { useCartStore } from '@/store/cartStore';
+import { useAuthStore } from '@/store/authStore';
+import { getMyCart } from '@/services/cart';
+import { dedupeCartLines } from '@/utils/cartDisplay';
+
+/** ---------- Types ---------- */
+/** Customer/admin order payload shipment card (ops fields only when staff has deliveries:read). */
+export type ShipmentSummary = {
+  _id: string;
+  id: string;
+  orderId: string;
+  provider: string;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  status: string;
+  courierName?: string | null;
+  shippingFee: number;
+  currency: string;
+  labelUrl?: string | null;
+  failureReason?: string | null;
+  bookedAt?: string | null;
+  deliveredAt?: string | null;
+};
+
+export type Order = {
+  _id: string;
+  id?: string;
+  user: string | {
+    _id: string;
+    name?: string;
+    username?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    profile?: {
+      firstName?: string;
+      lastName?: string;
+    };
+  };
+  carts?: Cart | null;
+  subtotal?: number;
+  taxAmount?: number;
+  taxRate?: number;
+  taxLabel?: string;
+  amount: number;
+  shippingFee?: number;
+  shippingMethod?: {
+    provider: string;
+    serviceCode: string;
+    courierName?: string;
+    fee: number;
+    currency?: string;
+    expiresAt: string;
+  } | null;
+  shippingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    lga?: string;
+    zip?: string;
+    country: string;
+    phone: string;
+    contactName?: string;
+  } | null;
+  /** Active shipment summary from order API (same record as Deliveries). */
+  shipment?: ShipmentSummary | null;
+  status: 'pending' | 'initiated' | 'paid' | 'shipped' | 'shipping' | 'delivered' | 'cancelled';
+  walletId: string;
+  address: string;
+  paymentReference?: string | null;
+  paymentProvider?: 'stripe' | 'paystack' | 'wallet' | null;
+  fulfilledAt?: string | null;
+  paidNotifiedAt?: string | null;
+  updatedBy?: string | null;
+  updatedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+  [k: string]: Json | undefined;
+};
+
+export type CartLine = {
+  lineType: 'product' | 'fabric';
+  product?: CartProduct['product'];
+  fabric?: {
+    _id: string;
+    name: string;
+    yardBundle?: number;
+    bundlePrice?: number;
+    [key: string]: unknown;
+  };
+  quantity: number;
+  productNote?: string[];
+  bundlePrice?: number;
+  yardBundle?: number;
+  _id?: string;
+};
+
+export type Cart = {
+  _id: string;                 // Cart ID
+  user: string;                // User ID
+  products?: CartProduct[];    // Legacy product lines
+  lines?: CartLine[];          // Product + fabric bundle lines
+  createdAt: string;           // ISO date string
+  updatedAt: string;           // ISO date string
+  __v: number;                 // Version key
+};
+
+export type CartProduct = {
+  product: string | null | {  // Product ID, null, or populated product object
+    _id: string;
+    name: string;
+    description?: string;
+    price: number;
+    images?: string[];
+    sizes?: string[];
+    [key: string]: unknown;
+  };
+  quantity: number;            // Quantity of the product
+  productNote?: string[];      // Size breakdown notes (e.g., ["1 extra-large", "4 large"])
+  _id: string;                 // Cart product ID
+};
+
+export type CreateOrderInput = {
+  carts: string;               // Cart ID (one cart per order)
+  /** Client estimate only — server recalculates authoritatively. Optional. */
+  amount?: number;
+  address: string;             // Delivery address line
+  shippingAddress?: OrderPlacementAddress | null;
+  shippingSelection?: ShippingSelectionInput | null;
+};
+
+export type UpdateOrderInput = Partial<CreateOrderInput> & {
+  status?: 'pending' | 'initiated' | 'paid' | 'shipped' | 'shipping' | 'delivered' | 'cancelled';
+};
+
+// Order placement types
+export interface OrderPlacementData {
+  cartId: string;
+  amount: number;
+  address: string;
+}
+
+export interface OrderPlacementAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  lga?: string;
+  zip?: string;
+  country?: string;
+  phone?: string;
+  contactName?: string;
+}
+
+/** Client selection bound to a server quote session (no rate tokens). */
+export type ShippingSelectionInput = {
+  quoteSessionId: string;
+  optionId: string;
+  fee: number;
+  courierName?: string;
+  serviceCode?: string;
+  provider?: string;
+};
+
+export interface CreateOrderFromCartInput {
+  address?: OrderPlacementAddress | null;
+  shippingSelection?: ShippingSelectionInput | null;
+}
+
+export interface OrderPlacementResult {
+  success: boolean;
+  orderId?: string;
+  error?: string;
+  errorCode?:
+  | 'NO_ADDRESS'
+  | 'NO_SHIPPING'
+  | 'SHIPPING_REQUIRED'
+  | 'SHIPPING_INVALID'
+  | 'SHIPPING_RATE_EXPIRED'
+  | 'DUPLICATE_ORDER'
+  | 'NOT_AUTHENTICATED'
+  | 'NETWORK_ERROR'
+  | 'INVALID_CART'
+  | 'EMPTY_CART'
+  | 'INVALID_AMOUNT'
+  | 'UNKNOWN';
+  order?: Order;
+}
+
+/** ---------- Endpoints ---------- */
+// Using {{host}}order format as specified
+const BASE = "/api/order";
+const paths = {
+  add: BASE,                                 // POST   /order
+  update: (orderId: string) => `${BASE}/${orderId}`, // PUT    /order/:orderId
+  delete: (orderId: string) => `${BASE}/${orderId}`, // DELETE /order/:orderId
+  list: BASE,                                // GET    /order
+  byId: (orderId: string) => `${BASE}/${orderId}`,   // GET    /order/:orderId
+  myOrders: `${BASE}/me`,                    // GET    /order/me
+};
+
+/** ---------- Helpers ---------- */
+const toQS = (params?: Record<string, string | number | boolean | undefined>) =>
+  params
+    ? `?${new URLSearchParams(
+      Object.entries(params).reduce<Record<string, string>>((acc, [k, v]) => {
+        if (v !== undefined && v !== null) acc[k] = String(v);
+        return acc;
+      }, {})
+    )}`
+    : "";
+
+// remove undefined keys so we only send what's present
+function compact<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as Partial<T>;
+}
+
+/** ---------- CRUD Operations ---------- */
+
+// Create order
+export async function createOrder(payload: CreateOrderInput) {
+  if (!payload?.carts || !payload.carts.trim()) {
+    throw new Error("createOrder: `carts` (cart ID) is required and cannot be empty.");
+  }
+  if (!payload?.address || !payload.address.trim()) {
+    throw new Error("createOrder: `address` is required and cannot be empty.");
+  }
+
+  const body = compact({
+    carts: payload.carts.trim(),
+    // Do not send client amount — server recalculates from cart + validated shipping.
+    address: payload.address.trim(),
+    shippingAddress: payload.shippingAddress ?? undefined,
+    shippingSelection: payload.shippingSelection ?? undefined,
+  });
+
+  console.log('Sending JSON payload:', body);
+
+  const raw = await api<MaybeWrapped<Order>>(paths.add, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  return unwrap<Order>(raw);
+}
+
+// Update order by orderId
+export async function updateOrder(orderId: string, payload: UpdateOrderInput) {
+  if (!orderId || !orderId.trim()) {
+    throw new Error("updateOrder: `orderId` is required in the URL path.");
+  }
+
+  const body = compact({
+    address: payload.address?.trim(),
+    status: payload.status,
+  });
+
+  console.log('Updating order with payload:', body);
+
+  const raw = await api<MaybeWrapped<Order>>(paths.update(orderId), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  return unwrap<Order>(raw);
+}
+
+// Delete order by orderId
+export async function deleteOrder(orderId: string) {
+  if (!orderId || !orderId.trim()) {
+    throw new Error("deleteOrder: `orderId` is required in the URL path.");
+  }
+  const raw = await api<MaybeWrapped<{ deleted: boolean }>>(paths.delete(orderId), {
+    method: "DELETE",
+    credentials: "include",
+  });
+  return unwrap<{ deleted: boolean }>(raw);
+}
+
+// Get all orders (admin) - FIXED
+export async function getOrders(params?: Record<string, string | number | boolean | undefined>) {
+  const raw = await api<MaybeWrapped<Order[]>>(
+    `${paths.list}${toQS(params)}`
+  );
+  const orders = unwrap<Order[]>(raw);
+  return orders ?? [];
+}
+
+// Get orders by status (admin) - filters on frontend since API returns all orders
+export async function getOrdersByStatus(status: string, params?: Record<string, string | number | boolean | undefined>) {
+  const allOrders = await getOrders(params);
+  // Filter by status on the frontend
+  return allOrders.filter(order => order.status === status);
+}
+
+// Get one order by orderId
+export async function getOrderById(orderId: string) {
+  if (!orderId || !orderId.trim()) {
+    throw new Error("getOrderById: `orderId` is required.");
+  }
+  const raw = await api<MaybeWrapped<Order>>(paths.byId(orderId));
+  const data = unwrap<Order>(raw);
+  return data ?? null;
+}
+
+// Get current user's orders - FIXED
+export async function getMyOrders(params?: Record<string, string | number | boolean | undefined>) {
+  const raw = await api<MaybeWrapped<Order[]>>(
+    `${paths.myOrders}${toQS(params)}`
+  );
+  const orders = unwrap<Order[]>(raw);
+  return orders ?? [];
+}
+
+// Get a specific order from current user's orders
+export async function getMyOrderById(orderId: string) {
+  if (!orderId || !orderId.trim()) {
+    throw new Error("getMyOrderById: `orderId` is required.");
+  }
+
+  // Fetch all user's orders and find the specific one
+  const orders = await getMyOrders();
+  const order = orders.find(o => o._id === orderId);
+
+  if (!order) {
+    throw new Error(`Order with ID ${orderId} not found in your orders.`);
+  }
+
+  return order;
+}
+
+// Update order status (convenience function)
+export async function updateOrderStatus(orderId: string, status: Order['status']) {
+  return updateOrder(orderId, { status });
+}
+
+/** ---------- Order Placement Functions ---------- */
+
+function formatDeliveryAddress(
+  addr: OrderPlacementAddress | null | undefined
+): string | null {
+  if (!addr) return null;
+  const line1 = String(addr.line1 ?? "").trim();
+  const city = String(addr.city ?? "").trim();
+  const state = String(addr.state ?? "").trim();
+  if (!line1 || !city || !state) return null;
+  const parts = [
+    line1,
+    String(addr.line2 ?? "").trim() || undefined,
+    city,
+    String(addr.lga ?? "").trim() || undefined,
+    state,
+    String(addr.zip ?? "").trim() || undefined,
+    String(addr.country ?? "").trim() || undefined,
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
+/** Structured shipping address payload for POST /api/order (client). */
+export function toShippingAddress(
+  addr: OrderPlacementAddress | null | undefined
+): OrderPlacementAddress | null {
+  if (!addr) return null;
+  const line1 = String(addr.line1 ?? "").trim();
+  const city = String(addr.city ?? "").trim();
+  const state = String(addr.state ?? "").trim();
+  if (!line1 || !city || !state) return null;
+  return {
+    line1,
+    line2: String(addr.line2 ?? "").trim() || undefined,
+    city,
+    state,
+    lga: String(addr.lga ?? "").trim() || undefined,
+    zip: String(addr.zip ?? "").trim() || undefined,
+    country: String(addr.country ?? "").trim() || "NG",
+    phone: String(addr.phone ?? "").trim() || undefined,
+    contactName: String(addr.contactName ?? "").trim() || undefined,
+  };
+}
+
+/**
+ * Creates an order using the current cart and user data
+ * This runs alongside the existing checkout flow
+ */
+export async function createOrderFromCart(
+  input?: CreateOrderFromCartInput
+): Promise<OrderPlacementResult> {
+  try {
+    const cartStore = useCartStore.getState();
+    const authStore = useAuthStore.getState();
+
+    const { items } = cartStore;
+    const { isAuthenticated } = authStore;
+
+    // Validate authentication
+    if (!isAuthenticated) {
+      throw new Error('NOT_AUTHENTICATED: User must be authenticated to create an order');
+    }
+
+    // Prefer session cart from GET /api/cart/me — never trust a stale store cartId
+    // (user-scoped isolation; Cart has no orgId).
+    const serverCart = await getMyCart();
+    const cartId =
+      (serverCart?._id && String(serverCart._id)) ||
+      (cartStore.cartId ? String(cartStore.cartId) : "");
+    if (cartId && cartId !== cartStore.cartId) {
+      cartStore.setCartId(cartId);
+    }
+
+    // Validate cart
+    if (!cartId) {
+      throw new Error('INVALID_CART: No cart found');
+    }
+
+    if (items.length === 0) {
+      throw new Error('EMPTY_CART: Cart is empty');
+    }
+
+    // Server amount is authoritative (cart + validated shipping). No client total posted.
+
+    let placementAddress = input?.address ?? null;
+    let addressString = formatDeliveryAddress(placementAddress);
+
+    if (!addressString) {
+      let profileData: {
+        addresses?: OrderPlacementAddress[];
+      } | null = null;
+      try {
+        const response = await api<{
+          profile?: { addresses?: OrderPlacementAddress[] };
+        }>("/api/auth/me");
+        profileData = response.profile ?? null;
+      } catch (e) {
+        console.error('Failed to fetch profile:', e);
+      }
+
+      const defaultAddress =
+        profileData?.addresses?.find((addr) => (addr as { isDefault?: boolean }).isDefault) ||
+        profileData?.addresses?.[0];
+      placementAddress = defaultAddress ?? null;
+      addressString = formatDeliveryAddress(placementAddress);
+    }
+
+    if (!addressString || !placementAddress) {
+      throw new Error('NO_ADDRESS: No delivery address found. Please add an address at checkout.');
+    }
+
+    const orderPayload: CreateOrderInput = {
+      carts: cartId,
+      address: addressString,
+      shippingAddress: toShippingAddress(placementAddress),
+      shippingSelection: input?.shippingSelection ?? null,
+    };
+
+    console.log('Creating order with payload:', orderPayload);
+
+    const order = await createOrder(orderPayload);
+
+    console.log('Order created successfully:', order);
+
+    return {
+      success: true,
+      orderId: order._id,
+      order: order,
+    };
+
+  } catch (error) {
+    console.error('Failed to create order:', error);
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const normalized = message.toLowerCase();
+    let errorCode: OrderPlacementResult['errorCode'] = 'UNKNOWN';
+
+    if (error instanceof ApiError && error.status === 409) {
+      errorCode = 'SHIPPING_RATE_EXPIRED';
+    } else if (
+      normalized.includes('shipping_rate_expired') ||
+      (normalized.includes('shipping quote expired') ||
+        normalized.includes('select a delivery method again'))
+    ) {
+      errorCode = 'SHIPPING_RATE_EXPIRED';
+    } else if (
+      normalized.includes('shipping_required') ||
+      normalized.includes('delivery method is required') ||
+      normalized.includes('select a shipping rate')
+    ) {
+      errorCode = 'SHIPPING_REQUIRED';
+    } else if (normalized.includes('no delivery address') || normalized.includes('no_address')) {
+      errorCode = 'NO_ADDRESS';
+    } else if (
+      normalized.includes('shipping quote') ||
+      normalized.includes('shipping fee') ||
+      normalized.includes('shipping method') ||
+      normalized.includes('delivery method') ||
+      normalized.includes('required for shipping') ||
+      normalized.includes('shipping rates') ||
+      normalized.includes('shipping selection') ||
+      normalized.includes('courier') ||
+      normalized.includes('rate_expired') ||
+      normalized.includes('rate_invalid')
+    ) {
+      errorCode = 'SHIPPING_INVALID';
+    } else if (normalized.includes('already exists')) {
+      errorCode = 'DUPLICATE_ORDER';
+    } else if (normalized.includes('not_authenticated') || normalized.includes('not authenticated')) {
+      errorCode = 'NOT_AUTHENTICATED';
+    } else if (normalized.includes('failed to fetch') || normalized.includes('network')) {
+      errorCode = 'NETWORK_ERROR';
+    } else if (normalized.includes('invalid cart')) {
+      errorCode = 'INVALID_CART';
+    } else if (normalized.includes('empty cart') || normalized.includes('cart is empty')) {
+      errorCode = 'EMPTY_CART';
+    } else if (
+      normalized.includes('invalid order amount') ||
+      normalized.includes('must be greater than zero')
+    ) {
+      errorCode = 'INVALID_AMOUNT';
+    } else if (
+      normalized.includes('stock') ||
+      normalized.includes('not available') ||
+      normalized.includes('insufficient')
+    ) {
+      errorCode = 'INVALID_CART';
+    }
+
+    return {
+      success: false,
+      error: message || 'Failed to create order. Please try again.',
+      errorCode,
+    };
+  }
+}
+
+/**
+ * Gets the current cart data for order creation (sync helper).
+ * `totalAmount` is merchandise subtotal only — tax is applied server-side on create.
+ */
+export function getCartDataForOrder() {
+  const cartStore = useCartStore.getState();
+  const authStore = useAuthStore.getState();
+
+  const { items, cartId } = cartStore;
+  const { isAuthenticated } = authStore;
+
+  const merchandiseSubtotal = dedupeCartLines(items).reduce((total, item) => {
+    const itemPrice = typeof item.price === 'number' ? item.price : 0;
+    return total + itemPrice * item.quantity;
+  }, 0);
+
+  return {
+    cartId: cartId || '',
+    totalAmount: merchandiseSubtotal,
+    merchandiseSubtotal,
+    isAuthenticated,
+    itemCount: items.length,
+  };
+}
+
+/** ---------- Order Status Mapping ---------- */
+
+/**
+ * Maps backend order status to frontend categories
+ * Note: 'pending' orders are rare (payment initialization failures) and treated as cancelled
+ */
+export function mapOrderStatusToCategory(status: Order['status']): 'active' | 'completed' | 'cancelled' {
+  switch (status) {
+    case 'initiated':
+    case 'paid':
+    case 'shipping':
+    case 'shipped':
+      return 'active';
+    case 'delivered':
+      return 'completed';
+    case 'pending':
+    case 'cancelled':
+    default:
+      return 'cancelled';
+  }
+}
+
+export type ProfileOrderTabId =
+  | 'all'
+  | 'pending'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
+export function orderMatchesProfileTab(
+  order: Order,
+  tab: ProfileOrderTabId
+): boolean {
+  if (tab === 'all') return true;
+  if (tab === 'pending') {
+    return order.status === 'pending' || order.status === 'initiated';
+  }
+  if (tab === 'shipped') {
+    return order.status === 'shipped' || order.status === 'shipping';
+  }
+  return order.status === tab;
+}
+
+export function sortOrdersNewestFirst(orders: Order[]): Order[] {
+  return [...orders].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+/** Admin Orders UI: API populates username/firstName/lastName, not `user.name`. */
+export function getOrderCustomerName(user: Order["user"] | null | undefined): string {
+  if (!user) return "Unknown";
+  if (typeof user === "string") return `User ${user.substring(0, 8)}`;
+  const fromUser = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  if (fromUser) return fromUser;
+  const fromProfile = [
+    user.profile?.firstName,
+    user.profile?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  if (fromProfile) return fromProfile;
+  return user.username || user.name || user.email || "Unknown";
+}
+
+export function getProfileOrderTabLabel(tab: ProfileOrderTabId): string {
+  switch (tab) {
+    case 'all':
+      return 'orders';
+    case 'pending':
+      return 'pending payment';
+    case 'paid':
+      return 'paid';
+    case 'shipped':
+      return 'shipped';
+    case 'delivered':
+      return 'delivered';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return tab;
+  }
+}
+
+/**
+ * Gets order status display information
+ */
+export function getOrderStatusInfo(status: Order['status']) {
+  switch (status) {
+    case 'pending':
+      return { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' };
+    case 'initiated':
+      return { label: 'Initiated', color: 'bg-blue-100 text-blue-800' };
+    case 'paid':
+      return { label: 'Paid', color: 'bg-green-100 text-green-800' };
+    case 'shipping':
+      return { label: 'Shipping', color: 'bg-indigo-100 text-indigo-800' };
+    case 'shipped':
+      return { label: 'Shipped', color: 'bg-blue-100 text-blue-800' };
+    case 'delivered':
+      return { label: 'Delivered', color: 'bg-green-100 text-green-800' };
+    case 'cancelled':
+      return { label: 'Cancelled', color: 'bg-red-100 text-red-800' };
+    default:
+      return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+  }
+}
